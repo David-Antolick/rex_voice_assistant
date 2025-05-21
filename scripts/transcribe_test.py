@@ -10,7 +10,8 @@ from faster_whisper import WhisperModel
 vad_model, vad_utils = torch.hub.load(
     'snakers4/silero-vad',
     'silero_vad',
-    force_reload=False
+    force_reload=False,
+    trust_repo=True
 )
 get_speech_timestamps, _, _, _, _ = vad_utils
 

@@ -10,5 +10,5 @@
   "containerEnv": {
     "TORCH_CPP_LOG_LEVEL": "ERROR"
   },
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y libportaudio2 portaudio19-dev && sudo rm -rf /var/lib/apt/lists/* && pip uninstall -y nvidia-cudnn-cu12 || true && pip cache purge && sudo pip install --no-cache-dir nvidia-cudnn-cu12==9.5.1.17 && echo '/usr/local/lib/python3.12/site-packages/nvidia/cudnn/lib' | sudo tee /etc/ld.so.conf.d/nvidia-cudnn.conf >/dev/null && sudo ldconfig && pip install -r requirements.txt"
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y libportaudio2 portaudio19-dev && sudo rm -rf /var/lib/apt/lists/* && pip cache purge && sudo pip install --no-cache-dir nvidia-cudnn-cu12==9.5.1.17 && echo '/usr/local/lib/python3.12/site-packages/nvidia/cudnn/lib' | sudo tee /etc/ld.so.conf.d/nvidia-cudnn.conf >/dev/null && sudo ldconfig && pip install -r requirements.txt"
 }
