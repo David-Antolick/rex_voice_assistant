@@ -1,0 +1,12 @@
+# Paste this into terminal
+
+# 1 Make sure the loader knows about the new cuDNN-9 libs:
+echo "/usr/local/lib/python3.12/site-packages/nvidia/cudnn/lib" \
+  | sudo tee /etc/ld.so.conf.d/nvidia-cudnn.conf >/dev/null
+
+sudo ldconfig
+
+# 2 Verify that libcudnn_ops.so.9 (and friends) are now visible:
+ldconfig -p | grep libcudnn_ops
+# You should see entries like:
+#  libcudnn_ops.so.9 (libc6,x86-64) => /usr/local/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9

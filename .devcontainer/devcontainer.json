@@ -17,16 +17,12 @@
 		"all"
 	],
 
-	"containerEnv": {
-   	"CT2_WITH_CUDNN": "OFF"
-  	},
-
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
 
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y libportaudio2 portaudio19-dev libcudnn8 libcudnn8-dev && sudo rm -rf /var/lib/apt/lists/* && pip install -r requirements.txt"
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y libportaudio2 portaudio19-dev && sudo rm -rf /var/lib/apt/lists/* && pip install -r requirements.txt"
 
 	// Configure tool-specific properties.
 	// "customizations": {},

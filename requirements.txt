@@ -10,3 +10,6 @@ torch
 torchaudio 
 
 pyyaml
+
+#may god help you if this doesn't work
+nvidia-cudnn-cu12==9.5.1.17
