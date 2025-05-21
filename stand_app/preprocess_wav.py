@@ -81,7 +81,7 @@ def save_npy(audio: np.ndarray, path: Path) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Preprocess WAV for VAD/ASR")
     parser.add_argument("wav", type=Path, help="Input WAV path")
-    parser.add_argument("--out", type=Path, default=None, help="Optional .npy output path")
+    parser.add_argument("--out", type=Path, default='stand_app/outputs/processed_audio.npy', help="Optional .npy output path")
     parser.add_argument("--target-sr", type=int, default=16_000, help="Target sample‑rate (Hz)")
     args = parser.parse_args()
 
