@@ -1,36 +1,26 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/python
+// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
 {
-	"name": "Python 3",
+	"name": "Ubuntu",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/python:1-3.12-bullseye",
+	"image": "mcr.microsoft.com/devcontainers/base:jammy",
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {},
 		"ghcr.io/devcontainers/features/git:1": {},
-		"ghcr.io/devcontainers/features/nvidia-cuda:1": {}
+		"ghcr.io/devcontainers/features/nvidia-cuda:1": {},
+		"ghcr.io/devcontainers/features/python:1": {
+			"version": "3.12"
+		}
 	},
 
-	// Features to add to the dev container. More info: https://containers.dev/features.
-	// "features": {},
-	"runArgs": [
-		"--gpus",
-		"all"
-	],
+	"runArgs": ["--gpus", "all"],
+
 
 	"containerEnv": {
-   	"CT2_WITH_CUDNN": "OFF"
+    "TORCH_CPP_LOG_LEVEL": "ERROR",  // silence NNPACK warnings
+    "CT2_DISABLE_CUDNN": "1"         // force CTranslate2 → cuBLAS only
   	},
 
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
-
-
-	// Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y libportaudio2 portaudio19-dev libcudnn8 libcudnn8-dev && sudo rm -rf /var/lib/apt/lists/* && pip install -r requirements.txt"
-
-	// Configure tool-specific properties.
-	// "customizations": {},
-
-	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-	// "remoteUser": "root"
+	"postCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends libportaudio2 portaudio19-dev ffmpeg && sudo rm -rf /var/lib/apt/lists/* && pip install -r requirements.txt"
 }
+
