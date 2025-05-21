@@ -1,6 +1,12 @@
-faster-whisper
+numpy
+
 sounddevice
+
+faster-whisper
+
 silero-vad
-pyyaml
+
 torch
-torchaudio
+torchaudio 
+
+pyyaml
