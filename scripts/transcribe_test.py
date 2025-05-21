@@ -16,11 +16,11 @@ vad_model, vad_utils = torch.hub.load(
 get_speech_timestamps, _, _, _, _ = vad_utils
 
 # Load Whisper
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda" 
 model = WhisperModel(
     "medium.en",
     device=device,
-    compute_type="int8_float16"
+    compute_type="float16"
 )
 
 # Read your WAV
