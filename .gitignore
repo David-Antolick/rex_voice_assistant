@@ -1,2 +1,3 @@
-scripts/
-sounds/
+scripts/*
+sounds/*
+stand_app/outputs/*
