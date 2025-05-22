@@ -2,6 +2,8 @@ numpy
 scipy
 
 sounddevice
+pydub
+ffmpeg-python
 
 faster-whisper
 

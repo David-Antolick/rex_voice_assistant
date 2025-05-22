@@ -1,29 +1,11 @@
 # stand_app/preprocess_wav.py
 """Pre‑processing utility for VAD‑ready audio.
 
-Runs as a **stand‑alone** script:
 
-```bash
-python preprocess_wav.py path/to/input.wav  
-python preprocess_wav.py sounds/basic_commands.wav --out audio.npy --target-sr 16000
-```
 
-Features
-========
-1. **Universal input**: accepts any mono/stereo WAV.
-2. **Mono mix‑down**: sums stereo → mono (average).
-3. **Resample**: converts to target sample‑rate (default 16 kHz) using polyphase filter from ``scipy.signal``.
-4. **Normalize**: converts ``int16`` → ``float32`` in **[-1.0, 1.0]`` – Silero VAD expects this.
-5. **Optional save**: writes NumPy ``.npy`` file for downstream scripts.
-6. **JSON metadata**: prints a short JSON summary to stdout for quick inspection.
+Run with:
+python stand_app/preprocess_wav.py sounds/<INPUT>.m4a --out stand_app/outputs/<OUPUT>.npy
 
-Dependencies
-------------
-* ``numpy``
-* ``scipy`` (only ``scipy.signal``) – install via ``pip install scipy``.
-
-The script purposefully avoids heavyweight deps (librosa/torchaudio) to keep the
-stand‑alone test environment minimal.
 """
 from __future__ import annotations
 
@@ -35,8 +17,17 @@ from typing import Tuple
 
 import numpy as np
 from scipy.signal import resample_poly
+import ffmpeg
 
 TARGET_DTYPE = np.float32
+
+
+
+def convert_to_wav(input_path: Path, tmp_wav_path: Path) -> Path:
+    """Convert non-WAV formats to a temporary WAV file."""
+    ffmpeg.input(str(input_path)).output(str(tmp_wav_path), acodec='pcm_s16le', ac=1, ar=16000).run(overwrite_output=True)
+    return tmp_wav_path
+
 
 
 def read_wav(path: Path) -> Tuple[np.ndarray, int]:
@@ -89,7 +80,13 @@ def main():
         raise FileNotFoundError(args.wav)
 
     # Load
-    audio_i16, sr = read_wav(args.wav)
+    input_path = args.wav
+    if input_path.suffix.lower() != ".wav":
+        print(f"Converting {input_path.name} to WAV...")
+        input_path = input_path.with_suffix(".tmp.wav")
+        convert_to_wav(args.wav, input_path)
+
+    audio_i16, sr = read_wav(input_path)
 
     # Resample if needed
     audio_i16 = resample(audio_i16, sr, args.target_sr)
@@ -101,6 +98,9 @@ def main():
     # Optionally save
     if args.out:
         save_npy(audio_f32, args.out.with_suffix(".npy"))
+        if input_path != args.wav and input_path.exists():
+            input_path.unlink()  # deletes temp WAV
+
 
     # Print summary
     meta = {
