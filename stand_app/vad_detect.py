@@ -13,6 +13,10 @@ Outputs
 
 * Prints a JSON list of speech segments: [{"start": float, "end": float}, ...]
 * Emits a visual timeline to stdout: "0.00–0.03 0", where 1 = speech, 0 = silence.
+
+run with:
+python stand_app/vad_detect.py --inp stand_app/outputs/processed_audio.npy --npy --save stand_app/outputs/speech_segments.json
+
 """
 from __future__ import annotations
 
@@ -92,12 +96,12 @@ def chunk_timeline(audio: np.ndarray, segments: List[dict], args):
 def main():
     ap = argparse.ArgumentParser(description="Run Silero VAD on an audio file")
     ap.add_argument("--save", type=Path, help="Optional path to save speech segments as JSON")
-    ap.add_argument("audio", type=Path, help=".wav or .npy file")
+    ap.add_argument("--inp", type=Path, help=".wav or .npy file")
     ap.add_argument("--npy", action="store_true", help="Input is a .npy file")
     ap.add_argument("--verbose", action="store_true", help="Enable detailed readout of VAD timeline")
     args = ap.parse_args()
 
-    audio = load_audio(args.audio, is_npy=args.npy)
+    audio = load_audio(args.inp, is_npy=args.npy)
     segments = detect_segments(audio)
 
     if args.save:

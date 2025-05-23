@@ -27,14 +27,10 @@ from pathlib import Path
 from commands import *
 import commands
 
-
 # Command match patterns → canonical function names
 COMMAND_PATTERNS = [
-    
     (re.compile(r"\bstop music\b", re.IGNORECASE), "stop_music"),
-
     (re.compile(r"\bstart music\b", re.IGNORECASE), "start_music"),
-
     (re.compile(r"\bplay (.+?) by ([\w\s]+)", re.IGNORECASE), "play_song"),
     (re.compile(r"\bplay (.+)", re.IGNORECASE), "play_song")
 ]
@@ -70,6 +66,8 @@ def main():
     parser.add_argument("--in", dest="infile", type=Path, required=True, help="Path to transcription .csv")
     args = parser.parse_args()
 
+    activation_active = False
+
     with open(args.infile, newline="") as f:
         reader = csv.reader(f)
         for row in reader:
@@ -77,21 +75,23 @@ def main():
                 continue  # Skip malformed rows
             start, end, text = row
             text = text.strip()
-            
-            if not re.search(r"\\bhey rex\\b", text, re.IGNORECASE):
-                print(f"[{start}–{end}s] → (ignored, no activation): '{text}'")
+
+            if re.search(r"\bhey rex\b", text, re.IGNORECASE):
+                activation_active = True
+                print(f"[{start}-{end}s] → (activation detected): '{text}'")
                 continue
 
-            # Strip activation phrase
-            text = re.sub(r"\\bhey rex\\b[,:]?\\s*", "", text, flags=re.IGNORECASE)
-
-            command = match_command(text)
-
-            command = match_command(text.strip())
-            if command:
-                print(f"[{start}–{end}s] → matched: {command}")
+            if activation_active:
+                # Strip activation if lingering
+                text = re.sub(r"\bhey rex\b[,:]?\s*", "", text, flags=re.IGNORECASE)
+                command = match_command(text.strip())
+                if command:
+                    print(f"[{start}-{end}s] → matched: {command}")
+                else:
+                    print(f"[{start}-{end}s] → (no match)  '{text.strip()}'")
+                activation_active = False  # Reset trigger
             else:
-                print(f"[{start}–{end}s] → (no match)  '{text.strip()}'")
+                print(f"[{start}-{end}s] → (ignored, no activation): '{text}'")
 
 
 if __name__ == "__main__":
