@@ -17,7 +17,7 @@ Dependencies:
 
 
 run with:
-python stand_app/transcribe_segs.py --inp stand_app/outputs/processed_audio.npy stand_app/outputs/speech_segments.json --out stand_app/outputs/transcript.csv
+python stand_app/transcribe_segs.py --inp stand_app/outputs/processed_audio.npy --segs stand_app/outputs/speech_segments.json --out stand_app/outputs/transcript.csv
 
 
 """
@@ -69,13 +69,13 @@ def run_whisper(model: WhisperModel, audio: np.ndarray, segments: list[dict], ar
 def main():
     ap = argparse.ArgumentParser(description="Transcribe segments using Whisper")
     ap.add_argument("--inp", type=Path, help="Path to .npy audio")
-    ap.add_argument("segments", type=Path, help="Path to segment JSON")
+    ap.add_argument("--segs", type=Path, help="Path to segment JSON")
     ap.add_argument("--out", type=Path, help="Optional path to save transcript with timestamps")
 
     args = ap.parse_args()
 
     model = WhisperModel("medium.en", device="cuda", compute_type="int8")
-    audio, segments = load_inputs(args.inp, args.segments)
+    audio, segments = load_inputs(args.inp, args.segs)
 
     run_whisper(model, audio, segments, args)
 

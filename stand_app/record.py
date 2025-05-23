@@ -59,10 +59,9 @@ def main():
     run_step(["python", "stand_app/vad_detect.py", "--inp", str(args.tmp), "--npy", "--save", str(args.segs)])
 
     # 4) transcribe
-    run_step([
-      "python", "stand_app/transcribe_segments.py",
+    run_step(["python", "stand_app/transcribe_segs.py",
       "--inp",  str(args.tmp),
-      str(args.segs),
+      "--segs", str(args.segs),
       "--out",  str(args.txt)
     ])
 
