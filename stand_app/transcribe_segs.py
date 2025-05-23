@@ -53,9 +53,16 @@ def run_whisper(model: WhisperModel, audio: np.ndarray, segments: list[dict], ar
         result, _ = model.transcribe(segment_audio, language="en", beam_size=5, temperature=0.0)
 
         for chunk in result:
-            line = f"{seg['start']:.2f}, {seg['end']:.2f}, {chunk.text.strip()}"
-            print(line)
-            lines.append(line)
+          start = seg['start']
+          end   = seg['end']
+          text  = chunk.text.strip()
+
+          # kill off any commas
+          text = text.replace(',', '')
+
+          line = f"{start:.2f}, {end:.2f}, {text}"
+          print(line)
+          lines.append(line)
 
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)

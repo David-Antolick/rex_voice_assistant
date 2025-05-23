@@ -31,8 +31,12 @@ import commands
 COMMAND_PATTERNS = [
     (re.compile(r"\bstop music\b", re.IGNORECASE), "stop_music"),
     (re.compile(r"\bstart music\b", re.IGNORECASE), "start_music"),
-    (re.compile(r"\bplay (.+?) by ([\w\s]+)", re.IGNORECASE), "play_song"),
-    (re.compile(r"\bplay (.+)", re.IGNORECASE), "play_song")
+    (re.compile(r"\bnext song\b", re.IGNORECASE), "next_track"),
+    (re.compile(r"\bgo back\b", re.IGNORECASE), "previous_track"),
+    (re.compile(r"\bvolume up\b", re.IGNORECASE), "volume_up"),
+    (re.compile(r"\bvolume down\b", re.IGNORECASE), "volume_down"),
+
+    (re.compile(r"\bplay (.+?) by (.+)", re.IGNORECASE), "play_song"),   # not yet supported
 ]
 
 # Map string names to actual functions
