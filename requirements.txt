@@ -2,6 +2,7 @@ numpy
 scipy
 
 sounddevice
+soundfile
 pydub
 ffmpeg-python
 
