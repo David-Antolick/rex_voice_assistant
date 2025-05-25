@@ -5,3 +5,6 @@ stand_app/outputs/*
 
 *.pyc
 *.env
+
+
+notes.txt
