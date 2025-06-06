@@ -1,4 +1,5 @@
-"""matcher.py
+"""
+matcher.py
 Regex-based command dispatcher for the REX assistant.
 
 Usage inside your main program (rex.py):
@@ -19,7 +20,7 @@ import logging
 import re
 from typing import Callable, Iterable
 
-import rex_main.commands  # your stub handlers live here
+import rex_main.commands as commands
 
 __all__ = ["dispatch_command"]
 

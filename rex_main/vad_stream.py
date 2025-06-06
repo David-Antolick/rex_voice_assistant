@@ -52,8 +52,8 @@ class SileroVAD:
         *,
         sample_rate: int = 16_000,
         frame_ms: int = 32,
-        speech_threshold: float = 0.5,
-        silence_ms: int = 300,
+        speech_threshold: float = 0.65,
+        silence_ms: int = 500,
         max_utterance_ms: int = 10_000,
     ):
         self.in_q = in_queue
@@ -113,4 +113,6 @@ class SileroVAD:
 
             # pick the last frame, column 0 (speech logit)
             speech_logit = logits[-1, 0]
+            speech_prob = float(torch.sigmoid(logits[-1, 0]))
+            print(f"VAD={speech_prob:.2f}")
             return float(torch.sigmoid(speech_logit).item())

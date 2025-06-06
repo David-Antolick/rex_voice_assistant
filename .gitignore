@@ -1,10 +1,12 @@
 scripts/*
 sounds/*
 stand_app/outputs/*
+models/*
 
 
 *.pyc
 *.env
+
 
 
 notes.txt

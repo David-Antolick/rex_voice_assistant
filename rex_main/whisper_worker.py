@@ -23,7 +23,7 @@ class WhisperWorker:
     Parameters
     ----------
     in_queue : asyncio.Queue[np.ndarray]
-        Utterance-level PCM (float32, −1…1, 16 kHz).
+        Utterance-level PCM (float32, -1…1, 16 kHz).
     out_queue : asyncio.Queue[str]
         Recognised text; lower-cased, stripped.
     model_name : str, default "small.en"

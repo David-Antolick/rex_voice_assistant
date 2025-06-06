@@ -72,13 +72,14 @@ class AudioStream:
         # Spawn ffmpeg → raw PCM on stdout
         cmd = [
             "ffmpeg",
-            "-hide_banner", "-loglevel", "error",
-            "-f", "pulse",          # PulseAudio host set via $PULSE_SERVER
-            "-i", "default",        # default input source
-            "-ac", "1",             # mono
-            "-ar", str(self.samplerate),
-            "-f", "s16le", "-"      # raw 16-bit little-endian to stdout
+            "-hide_banner",
+            "-nostats",
+            "-loglevel", "quiet",          # ← *pair stays together*
+            "-f", "pulse", "-i", "default",
+            "-ac", "1", "-ar", str(self.samplerate),
+            "-f", "s16le", "pipe:1"        # raw int16 to stdout
         ]
+
         self._proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
