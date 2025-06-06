@@ -11,6 +11,11 @@
   "source=${localWorkspaceFolder}/pulse_conf/client.conf,target=/etc/pulse/client.conf,type=bind,consistency=delegated"
   ],
 
+  "containerEnv": {
+  "HF_HOME": "/workspaces/rex/models",
+  "HF_MODEL_HOME": "/workspaces/rex/models"
+  },
+
   "runArgs": [
     "--gpus", "all",
     "-e", "PULSE_SERVER=tcp:host.docker.internal:4713"
