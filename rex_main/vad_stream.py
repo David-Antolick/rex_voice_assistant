@@ -68,8 +68,8 @@ class SileroVAD:
         self._model: Optional[torch.jit.ScriptModule] = None
         self._h: Optional[Tuple[torch.Tensor, torch.Tensor]] = None  # LSTM hidden-state
 
-    async def run(self):  # noqa: C901 – a bit long but readable
-        """Endless coroutine – call with `asyncio.create_task`."""
+    async def run(self):  # noqa: C901 - a bit long but readable
+        """Endless coroutine - call with `asyncio.create_task`."""
         self._lazy_init()
         speech_buf: list[np.ndarray] = []
         silence_ctr = 0
@@ -102,7 +102,7 @@ class SileroVAD:
         # load TorchScript model + utility fns
         self._model, utils = torch.hub.load(_REPO, _MODEL, trust_repo=True)
         self._model.eval().to("cpu")          # tiny → CPU is fine
-        # utils[0] is now get_speech_timestamps()  – we DON'T need it here
+        # utils[0] is now get_speech_timestamps()  - we DON'T need it here
         # because we want frame-wise scores. We'll query the model directly.
 
     def _infer(self, pcm: np.ndarray) -> float:
@@ -113,6 +113,4 @@ class SileroVAD:
 
             # pick the last frame, column 0 (speech logit)
             speech_logit = logits[-1, 0]
-            speech_prob = float(torch.sigmoid(logits[-1, 0]))
-            print(f"VAD={speech_prob:.2f}")
             return float(torch.sigmoid(speech_logit).item())
