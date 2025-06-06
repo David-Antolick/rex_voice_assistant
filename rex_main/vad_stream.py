@@ -53,7 +53,7 @@ class SileroVAD:
         sample_rate: int = 16_000,
         frame_ms: int = 32,
         speech_threshold: float = 0.65,
-        silence_ms: int = 500,
+        silence_ms: int = 750,
         max_utterance_ms: int = 10_000,
     ):
         self.in_q = in_queue

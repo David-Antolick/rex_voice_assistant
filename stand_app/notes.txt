@@ -1,0 +1,30 @@
+General setup notes (likely to be at least partially automated in the future)
+
+Connecting audio (no idea if this would work vpn into server, probably not):
+- download PulseAudio for windows (https://pgaskin.net/pulseaudio-win32/)
+- Make sure to open private connections and whatever the second option is
+- this should work with that then for audio streaming through default
+
+
+Connecting to youtube music (desktop app, likely not adding browser functionality)
+- Download here: https://ytmdesktop.app (github: https://github.com/ytmdesktop/ytmdesktop)
+- go into settings (gear in the top right of app)
+- enable 'companion server' and 'allow browser communication' + 'enable companion authorization'
+- this SHOULD open up your ability to comunicate via port 9863 (the default)
+- confrim using:
+curl http://host.docker.internal:9863/metadata
+-> { "apiVersions": ["v1"] }
+
+Get one time code:
+curl -X POST http://host.docker.internal:9863/api/v1/auth/requestcode \
+  -H "Content-Type: application/json" \
+  -d '{"appId":"myapp","appName":"MyApp","appVersion":"1.0.0"}'
+-> {'code': '1234'}
+
+use code to get token:
+curl -X POST http://host.docker.internal:9863/api/v1/auth/request \
+  -H "Content-Type: application/json" \
+  -d '{"appId":"myapp","code":"THE_CODE_YOU_JUST_GOT"}'
+-> { "token": "ea845423977fcbe9535547db2c09134b5087c352..." }
+
+set token in a .env file with other info and you're all setup
