@@ -12,8 +12,8 @@
   ],
 
   "containerEnv": {
-  "HF_HOME": "/workspaces/rex/models",
-  "HF_MODEL_HOME": "/workspaces/rex/models"
+  "HF_HOME": "/workspaces/rex_voice_assistant/models",
+  "HF_MODEL_HOME": "/workspaces/rex_voice_assistant/models"
   },
 
   "runArgs": [

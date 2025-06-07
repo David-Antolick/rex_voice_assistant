@@ -92,7 +92,7 @@ class WhisperWorker:
             beam_size=self.beam_size,
             temperature=0.0,
             best_of=1,
-            vad_filter=False,  # we already did VAD
+            vad_filter=False,  # seperate VAD
             language="en",
         )
         # 'segments' is a generator; join on the fly
