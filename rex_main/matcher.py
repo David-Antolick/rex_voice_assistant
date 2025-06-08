@@ -27,21 +27,33 @@ __all__ = ["dispatch_command"]
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# Command patterns
 
-_ACTIVATION = r"(?:hey\s+rex[,\s]+)?"  # optional wake-word prefix
+# Common helpers
+_END   = r"[.!?\s]*$"              # optional trailing punctuation / spaces
+_WORD  = r"\s*"                    # optional surrounding spaces
 
 COMMAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(fr"^{_ACTIVATION}stop\s+music[.! ]*$", re.I), "stop_music"),
-    (re.compile(fr"^{_ACTIVATION}start\s+music[.! ]*$", re.I), "start_music"),
-    (
-        re.compile(fr"^{_ACTIVATION}play\s+(.+?)\s+by\s+([\w\s]+)[.! ]*$", re.I),
-        "play_song",
-    ),
-    (
-        re.compile(fr"^{_ACTIVATION}play\s+(.+)[.! ]*$", re.I),
-        "play_song",
-    ),
+
+    # --- basic YT Music control already present ---
+    (re.compile(rf"^{_WORD}stop\s+music{_WORD}{_END}",  re.I), "stop_music"),
+    (re.compile(rf"^{_WORD}play\s+music{_WORD}{_END}", re.I), "start_music"),
+
+
+    # --- NEW: track navigation ---
+    (re.compile(rf"^{_WORD}(?:next|skip){_WORD}{_END}", re.I), "next_track"),
+    (re.compile(rf"^{_WORD}(?:last|previous){_WORD}{_END}", re.I), "previous_track"),
+    (re.compile(rf"^{_WORD}restart{_WORD}{_END}", re.I), "restart_track"),
+
+    # --- NEW: volume control ---
+    (re.compile(rf"^{_WORD}turn up{_END}",   re.I), "volume_up"),
+    (re.compile(rf"^{_WORD}turn down{_END}", re.I), "volume_down"),
+
+    
+    
+    
+    # Not implemented yet:
+    (re.compile(rf"^{_WORD}play\s+(.+?)\s+by\s+([\w\s]+){_END}", re.I), "play_song"),
+    (re.compile(rf"^{_WORD}play\s+(.+?){_END}",  re.I), "play_song")
 ]
 
 

@@ -58,19 +58,23 @@ def next_track():
 
 def previous_track():
     _send("previous")
+    _send("previous")  # one restarts song
+
+def restart_track():
+    _send("previous")
 
 def volume_up():
-    _send("volumeup")
+    _send("volumeUp")
 
 def volume_down():
-    _send("volumedown")
+    _send("volumeDown")
 
 def play_song(title: str, artist: str | None = None):
     # Search/queue requires Companion-Server v2; stub for now.
     logging.info("TODO play_song('%s', '%s')", title, artist)
 
 
-    '''(re.compile(fr"^{_ACTIVATION}skip\s+song[.! ]*$", re.I), "next_track"),
-        (re.compile(fr"^{_ACTIVATION}go\s+back[.! ]*$", re.I), "previous_track"),
-        (re.compile(fr"^{_ACTIVATION}volume\s+up[.! ]*$", re.I), "volume_up"),
-        (re.compile(fr"^{_ACTIVATION}volume\s+down[.! ]*$", re.I), "volume_down"),'''
+'''(re.compile(fr"^{_ACTIVATION}skip\s+song[.! ]*$", re.I), "next_track"),
+    (re.compile(fr"^{_ACTIVATION}go\s+back[.! ]*$", re.I), "previous_track"),
+    (re.compile(fr"^{_ACTIVATION}volume\s+up[.! ]*$", re.I), "volume_up"),
+    (re.compile(fr"^{_ACTIVATION}volume\s+down[.! ]*$", re.I), "volume_down"),'''
