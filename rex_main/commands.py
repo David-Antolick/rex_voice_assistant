@@ -1,80 +1,103 @@
-"""
-Command handlers for REX that control YouTube-Music-Desktop-App
-via its Companion-Server (https://github.com/ytmdesktop/ytmdesktop)
-"""
-
-import logging
-import requests
-import os
+# commands.py  – v2 
+from __future__ import annotations
+import logging, os, requests
+from typing import Any, Optional
 from dotenv import load_dotenv
 
+load_dotenv()        # take environment variables from .env.
 
-load_dotenv()  # reads .env into os.environ
+'''Confusingly, YTMD app currenntly interfaces as the v2 api, but has v1 in the URL.'''
 
-YTMD_TOKEN = os.getenv("YTMD_TOKEN")
-YTMD_HOST  = os.getenv("YTMD_HOST", "host.docker.internal")
-YTMD_PORT  = os.getenv("YTMD_PORT", "9863")
+__all__ = [
+    "ytmd", "play_music", "stop_music", "next_track", "previous_track",
+    "restart_track", "volume_up", "volume_down", "set_volume",
+    "like", "dislike",
+]
 
-ENDPOINT = f"http://{YTMD_HOST}:{YTMD_PORT}/api/v1/command"
+class YTMD:
+    """Thin client for YT Music Desktop Companion-Server (POST /api/v1/command)."""
+
+    def __init__(
+        self,
+        host: str | None = None,
+        port: str | None = None,
+        token: str | None = None,
+        timeout: int = 5,
+    ) -> None:
+        self.host   = host   or os.getenv("YTMD_HOST",  "host.docker.internal")
+        self.port   = port   or os.getenv("YTMD_PORT",  "9863")
+        self.token  = token  or os.getenv("YTMD_TOKEN")
+        self.timeout = timeout
+
+        self._base_url = f"http://{self.host}:{self.port}/api/v1/command"
+        self._headers  = {"Content-Type": "application/json"}
+        if self.token:                       # include only if present
+            self._headers["Authorization"] = self.token
 
 
+    #  low-level helper
+    def _send(self, command: str, *, value: Optional[Any] = None) -> None:
+        payload: dict[str, Any] = {"command": command}
+        if value is not None:
+            payload["data"] = value              # ← Companion-Server expects “value”
 
-
-_TIMEOUT = 2.0  # seconds
-
-
-def _send(cmd: str, value: str | None = None):
-    """
-    POST a command to YTMDesktop’s Companion Server.
-    Safe-fails with a log entry on error.
-    """
-    headers = {"Authorization": YTMD_TOKEN}
-    payload = {"command": cmd}
-    if value is not None:
-        payload["value"] = value
-
-    try:
         r = requests.post(
-            ENDPOINT,
+            self._base_url,
             json=payload,
-            headers=headers,
-            timeout=_TIMEOUT,
+            headers=self._headers,
+            timeout=self.timeout,
         )
         r.raise_for_status()
-        logging.info("YTMD ➜ %s(%s) OK", cmd, value)
-    except Exception as exc:
-        logging.error("YTMD command %s failed: %s", cmd, exc)
+        logging.debug("YTMD → %s (%s)", command, value)
+
+    #  music control
+    def play_music(self):
+        self._send("play")
+
+    def stop_music(self):
+        self._send("pause")
+
+    def next_track(self):
+        self._send("next")
+
+    def previous_track(self):
+        self._send("previous")
+        self._send("previous")
+
+    def restart_track(self):
+        self._send("previous")  # rewind current
+
+    # volume 
+    def volume_up(self):
+        self._send("volumeUp")
+    def volume_down(self):
+        self._send("volumeDown")
+
+    def set_volume(self, level: int | str) -> None:
+        try:
+            vol = max(0, min(100, int(level)))
+        except (ValueError, TypeError):
+            logging.error("Bad volume value: %s", level)
+            return
+        self._send("setVolume", value=vol)
+
+    # thumbs
+    def like(self):
+        self._send("toggleLike")
+    def dislike(self):
+        self._send("toggleDislike")
 
 
+# singleton + shims
+ytmd = YTMD()
 
-def start_music():
-    _send("play")
-
-def stop_music():
-    _send("pause")
-
-def next_track():
-    _send("next")
-
-def previous_track():
-    _send("previous")
-    _send("previous")  # one restarts song
-
-def restart_track():
-    _send("previous")
-
-def volume_up():
-    _send("volumeUp")
-
-def volume_down():
-    _send("volumeDown")
-
-def play_song(title: str, artist: str | None = None):
-    # Search/queue requires Companion-Server v2; stub for now.
-    logging.info("TODO play_song('%s', '%s')", title, artist)
-
-
-'''(re.compile(fr"^{_ACTIVATION}skip\s+song[.! ]*$", re.I), "next_track"),
-    (re.compile(fr"^{_ACTIVATION}go\s+back[.! ]*$", re.I), "previous_track"),
-    (re.compile(fr"^{_ACTIVATION}volume\s+up[.! ]*$", re.I), "volume_up"),
-    (re.compile(fr"^{_ACTIVATION}volume\s+down[.! ]*$", re.I), "volume_down"),'''
+play_music     = ytmd.play_music
+stop_music     = ytmd.stop_music
+next_track     = ytmd.next_track
+previous_track = ytmd.previous_track
+restart_track  = ytmd.restart_track
+volume_up      = ytmd.volume_up
+volume_down    = ytmd.volume_down
+set_volume     = ytmd.set_volume
+like           = ytmd.like
+dislike        = ytmd.dislike

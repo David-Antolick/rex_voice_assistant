@@ -34,20 +34,26 @@ _WORD  = r"\s*"                    # optional surrounding spaces
 
 COMMAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 
-    # --- basic YT Music control already present ---
+    # YTMD: play / pause
     (re.compile(rf"^{_WORD}stop\s+music{_WORD}{_END}",  re.I), "stop_music"),
-    (re.compile(rf"^{_WORD}play\s+music{_WORD}{_END}", re.I), "start_music"),
+    (re.compile(rf"^{_WORD}play\s+music{_WORD}{_END}", re.I), "play_music"),
 
 
-    # --- NEW: track navigation ---
+    # YTMD: track navigation
     (re.compile(rf"^{_WORD}(?:next|skip){_WORD}{_END}", re.I), "next_track"),
     (re.compile(rf"^{_WORD}(?:last|previous){_WORD}{_END}", re.I), "previous_track"),
     (re.compile(rf"^{_WORD}restart{_WORD}{_END}", re.I), "restart_track"),
 
-    # --- NEW: volume control ---
+    # YTMD: volume control
     (re.compile(rf"^{_WORD}turn up{_END}",   re.I), "volume_up"),
     (re.compile(rf"^{_WORD}turn down{_END}", re.I), "volume_down"),
+    (re.compile(rf"^{_WORD}volume\s+(\d{{1,3}}){_WORD}{_END}", re.I), "set_volume"),
 
+
+    # YTMD: like / dislike
+    (re.compile(rf"^{_WORD}like{_WORD}{_END}",    re.I), "like"),
+    (re.compile(rf"^{_WORD}dislike{_WORD}{_END}", re.I), "dislike"),
+    
     
     
     
