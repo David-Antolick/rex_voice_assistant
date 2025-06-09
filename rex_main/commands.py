@@ -52,7 +52,6 @@ class YTMD:
         logging.debug("YTMD → %s (%s)", command, value)
 
 
-    # NOT IMPLIMENTED YET
     def play_song(self, title: str, artist: str | None = None) -> None:
         """
         Search YouTube Music for “title [+ artist]” and play the first match.
