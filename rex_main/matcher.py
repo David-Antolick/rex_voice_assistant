@@ -43,6 +43,8 @@ COMMAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(rf"^{_WORD}(?:next|skip){_WORD}{_END}", re.I), "next_track"),
     (re.compile(rf"^{_WORD}(?:last|previous){_WORD}{_END}", re.I), "previous_track"),
     (re.compile(rf"^{_WORD}restart{_WORD}{_END}", re.I), "restart_track"),
+    (re.compile(rf"^{_WORD}search\s+(.+?)(?:\s+by\s+(.+?))?{_END}", re.I), "play_song"),
+
 
     # YTMD: volume control
     (re.compile(rf"^{_WORD}volume up{_END}",   re.I), "volume_up"),
@@ -53,18 +55,12 @@ COMMAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # YTMD: like / dislike
     (re.compile(rf"^{_WORD}like{_WORD}{_END}",    re.I), "like"),
     (re.compile(rf"^{_WORD}dislike{_WORD}{_END}", re.I), "dislike"),
-    
-    
-    
-    
-    # Not implemented yet:
-    (re.compile(rf"^{_WORD}play\s+(.+?)\s+by\s+([\w\s]+){_END}", re.I), "play_song"),
-    (re.compile(rf"^{_WORD}play\s+(.+?){_END}",  re.I), "play_song")
+
 ]
 
 
 # Public coroutine
-async def dispatch_command(text_queue: "asyncio.Queue[str]"):  # noqa: C901 – keep simple
+async def dispatch_command(text_queue: "asyncio.Queue[str]"):  
     """Forever task that reads recognised text and triggers handlers."""
 
     while True:

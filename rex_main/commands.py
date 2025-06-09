@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging, os, requests
 from typing import Any, Optional
 from dotenv import load_dotenv
+from ytmusicapi import YTMusic
 
 load_dotenv()        # take environment variables from .env.
 
@@ -49,6 +50,34 @@ class YTMD:
         )
         r.raise_for_status()
         logging.debug("YTMD → %s (%s)", command, value)
+
+
+    # NOT IMPLIMENTED YET
+    def play_song(self, title: str, artist: str | None = None) -> None:
+        """
+        Search YouTube Music for “title [+ artist]” and play the first match.
+        """
+        # 1) Build and run the search
+        query = f"{title} by {artist}" if artist else title
+        from ytmusicapi import YTMusic
+        ytm = YTMusic()  # make sure you've already configured its auth
+        results = ytm.search(query, filter="songs", limit=1)
+
+        if not results:
+            logging.error("No YTM results for %r", query)
+            return
+
+        # 2) Pull out the videoId
+        video_id = results[0].get("videoId")
+        if not video_id:
+            logging.error("Search hit with no videoId: %r", results[0])
+            return
+
+        # 3) Hit the Companion-Server
+        #    You need {"command":"changeVideo","data":{…}}
+        self._send("changeVideo",
+                   value={"videoId": video_id, "playlistId": None})
+        logging.info("YTMD playing videoId %s", video_id)
 
 
     #  music control
@@ -100,8 +129,11 @@ stop_music     = ytmd.stop_music
 next_track     = ytmd.next_track
 previous_track = ytmd.previous_track
 restart_track  = ytmd.restart_track
+play_song      = ytmd.play_song
+
 volume_up      = ytmd.volume_up
 volume_down    = ytmd.volume_down
 set_volume     = ytmd.set_volume
+
 like           = ytmd.like
 dislike        = ytmd.dislike
