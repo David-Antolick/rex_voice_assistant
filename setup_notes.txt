@@ -18,13 +18,13 @@ curl http://host.docker.internal:9863/metadata
 Get one time code:
 curl -X POST http://host.docker.internal:9863/api/v1/auth/requestcode \
   -H "Content-Type: application/json" \
-  -d '{"appId":"myapp","appName":"MyApp","appVersion":"1.0.0"}'
+  -d '{"appId":"rex_voice_assistant","appName":"Rex","appVersion":"1.0.0"}'
 -> {'code': '1234'}
 
 use code to get token:
 curl -X POST http://host.docker.internal:9863/api/v1/auth/request \
   -H "Content-Type: application/json" \
-  -d '{"appId":"myapp","code":"THE_CODE_YOU_JUST_GOT"}'
+  -d '{"appId":"rex_voice_assistant","code":"THE_CODE_YOU_JUST_GOT"}'
 -> { "token": "ea845423977fcbe9535547db2c09134b5087c352..." }
 
 set token in a .env file with other info and you're all setup
