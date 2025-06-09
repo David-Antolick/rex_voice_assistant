@@ -12,7 +12,13 @@ import os
 from typing import Optional
 
 import numpy as np
-from faster_whisper import WhisperModel, utils as fw_utils  # type: ignore
+from faster_whisper import WhisperModel, utils as fw_utils  
+import time
+
+import logging
+logger = logging.getLogger(__name__)
+logging.getLogger("faster_whisper").setLevel(logging.WARNING)
+
 
 __all__ = ["WhisperWorker"]
 
@@ -52,8 +58,12 @@ class WhisperWorker:
         self.compute_type = compute_type if self.device == "cuda" else "float32"
         self.beam_size = beam_size
 
+        logger.debug(
+            "WhisperWorker init: model=%s, device=%s, compute_type=%s, beam=%d",
+            self.model_name, self.device, self.compute_type, self.beam_size,
+        )
+
         # model will be loaded lazily inside the first loop iteration so that
-        # unit tests can monkey-patch environment variables before import.
         self._model: Optional[WhisperModel] = None
 
     async def run(self):
@@ -63,9 +73,23 @@ class WhisperWorker:
 
         while True:
             pcm = await self.in_q.get()
+
+            # Debug: chunk size & duration
+            cnt = pcm.shape[0] if hasattr(pcm, "shape") else len(pcm)
+            dur = cnt / 16000
+            logger.debug("WhisperWorker → got %d samples (~%.2f s)", cnt, dur)
+
+            # Debug: transcription timing
+            t0 = time.perf_counter()
             text = await asyncio.get_running_loop().run_in_executor(
                 None, self._transcribe, pcm
             )
+            dt = (time.perf_counter() - t0) * 1000
+            logger.debug("WhisperWorker → transcription took %.1f ms", dt)
+
+            # Debug: transcription output
+            logger.debug("WhisperWorker → text: %r", text)
+
             await self.out_q.put(text)
             self.in_q.task_done()
 
@@ -82,6 +106,11 @@ class WhisperWorker:
         compute_type=self.compute_type,
         download_root=os.getenv("HF_MODEL_HOME", "/tmp/hf_models"),
         )   
+
+        logger.info(
+        "Loaded WhisperModel '%s' on %s [%s]",
+        self.model_name, self.device, self.compute_type,
+        )
 
     # called in threadpool so can be blocking/heavy
     def _transcribe(self, pcm: np.ndarray) -> str:

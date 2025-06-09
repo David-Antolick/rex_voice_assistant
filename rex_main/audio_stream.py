@@ -5,10 +5,10 @@ Usage example (inside your main asyncio program):
 
     audio_q = asyncio.Queue()
     async with AudioStream(audio_q):
-        ...  # other coroutines (VAD, Whisper, etc.)
+          # other coroutines (VAD, Whisper, etc.)
 
 Each item placed on *audio_q* is a 1-D NumPy array of float32 PCM samples
-(normalised to -1.0…1.0) exactly *frame_ms* milliseconds long.
+(normalised to -1.0…1.0) exactly *frame_ms* milliseconds long. (default 32ms,512 samples at 16kHz)
 """
 
 from __future__ import annotations
@@ -16,9 +16,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from typing import Optional
-
+import subprocess, shlex
 import numpy as np
 import sounddevice as sd
+
+import logging
+logger = logging.getLogger(__name__)
 
 __all__ = ["AudioStream"]
 
@@ -32,8 +35,8 @@ class AudioStream:
         Destination queue that will receive PCM blocks.
     samplerate : int, default 16_000
         Target sampling rate (Hz).  Make sure downstream models agree.
-    frame_ms : int, default 40
-        Duration of each frame in milliseconds.  Values ≤ 30ms keep VAD latency low.
+    frame_ms : int, default 32
+        Duration of each frame in milliseconds. Must be consistent with VAD framework.
     """
 
     def __init__(self, queue: asyncio.Queue, *, samplerate: int = 16_000, frame_ms: int = 32):
@@ -64,26 +67,67 @@ class AudioStream:
     def _start_stream(self):
         """Launch a background ffmpeg process and its reader coroutine.
 
-        We use PulseAudio’s ‘default’ source and write 16-bit little-endian
+        We use PulseAudio's 'default' source and write 16-bit little-endian
         PCM to stdout so no temporary files are created.
         """
-        import subprocess, shlex
+
+
+        # show configured frame size & rates
+        logger.debug(
+            "AudioStream starting: samplerate=%d Hz, frame_ms=%d ms → frame_len=%d samples",
+             self.samplerate, self.frame_ms, self.frame_len,
+        )   
+        
+        # inspect sounddevice input config
+        default_input, _ = sd.default.device
+
+        if default_input is None or default_input < 0:
+            # you’re using ffmpeg’s “default” source, so sounddevice hasn’t picked one
+            logger.debug(
+                "No sounddevice default input device (got %s); FFmpeg default will be used",
+                default_input,
+            )
+            # list actual hardware mics in case you want to bind one later
+            devices = sd.query_devices()
+            inputs = [
+                (i, d["name"]) 
+                for i, d in enumerate(devices) 
+                if d.get("max_input_channels", 0) > 0
+            ]
+            logger.debug("Available input devices: %s", inputs)
+        else:
+            # real default is set—confirm it
+            try:
+                dev_info = sd.query_devices(default_input, kind="input")
+                logger.debug(
+                    "sounddevice default input device [%d]: %s",
+                    default_input,
+                    dev_info.get("name", dev_info),
+                )
+            except Exception as e:
+                logger.debug(
+                    "Error querying input device %d: %s",
+                    default_input,
+                    e,
+                )
+
 
         # Spawn ffmpeg → raw PCM on stdout
         cmd = [
             "ffmpeg",
             "-hide_banner",
             "-nostats",
-            "-loglevel", "quiet",          # ← *pair stays together*
+            "-loglevel", "quiet",          # ← pair stays together
             "-f", "pulse", "-i", "default",
             "-ac", "1", "-ar", str(self.samplerate),
             "-f", "s16le", "pipe:1"        # raw int16 to stdout
         ]
 
+        logger.debug("ffmpeg cmd: %s", " ".join(cmd))
         self._proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            bufsize=0  # unbuffered so we can read exact frame sizes
+            bufsize=0  # unbuffered
         )
 
         if self._proc.stdout is None:

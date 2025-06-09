@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import logging
 import signal
 from pathlib import Path
 from typing import Optional
@@ -23,11 +22,7 @@ from rex_main.vad_stream import SileroVAD
 from rex_main.whisper_worker import WhisperWorker
 from rex_main.matcher import dispatch_command
 
-# Logging setup (simple colourless formatter)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+import logging
 logger = logging.getLogger("rex")
 
 
@@ -53,6 +48,12 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Beam size for Whisper decoding (1 is fastest)",
     )
     p.add_argument(
+        "--log_file",
+        type=str,
+        default="rex_main/logs/rex_log.log",
+        help="Path to write rotating logs",
+    )
+    p.add_argument(
         "--debug",
         action="store_true",
         help="Verbose logging",
@@ -63,10 +64,45 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 # Main orchestration
 
 async def main(opts: argparse.Namespace):
-    if opts.debug:
-        logging.getLogger().setLevel(logging.DEBUG)
 
-    # Queues (typed for clarity)
+    """Main entry-point coroutine."""
+
+   # ___ Logging setup ___
+    root = logging.getLogger()
+    # Remove any existing handlers
+    for h in root.handlers[:]:
+        root.removeHandler(h)
+    level = logging.DEBUG if opts.debug else logging.INFO
+    root.setLevel(level)
+
+    # Create a common formatter
+    fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    formatter = logging.Formatter(fmt)
+
+    # Console handler (always)
+    console = logging.StreamHandler()
+    console.setLevel(level)
+    console.setFormatter(formatter)
+    root.addHandler(console)
+
+    # Rotating file handler
+    if opts.log_file:
+        from logging.handlers import RotatingFileHandler
+        fileh = RotatingFileHandler(
+            opts.log_file,
+            maxBytes=2_000_000,
+            backupCount=2,
+        )
+        fileh.setLevel(level)
+        fileh.setFormatter(formatter)
+        root.addHandler(fileh)
+        
+    # Suppress other loggers to warning level
+    logging.getLogger("torio._extension.utils").setLevel(logging.WARNING)
+    logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
+    # ___ End logging setup ___
+
+    # Queues
     audio_q: "asyncio.Queue[np.ndarray]" = asyncio.Queue(maxsize=50)
     speech_q: "asyncio.Queue[np.ndarray]" = asyncio.Queue(maxsize=10)
     text_q: "asyncio.Queue[str]" = asyncio.Queue(maxsize=10)
@@ -95,7 +131,7 @@ async def main(opts: argparse.Namespace):
         try:
             await asyncio.gather(*tasks)
         except asyncio.CancelledError:
-            logger.info("Shutdown requested – waiting for tasks to finish…")
+            logger.info("Shutdown requested - waiting for tasks to finish...")
             await asyncio.gather(*tasks, return_exceptions=True)
 
 
@@ -106,6 +142,5 @@ def _cancel_tasks(tasks: list[asyncio.Task]):
 
 
 # Entry-point
-
 if __name__ == "__main__":
     asyncio.run(main(parse_args()))

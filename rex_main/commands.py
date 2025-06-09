@@ -1,13 +1,15 @@
-# commands.py  – v2 
+# commands.py  – v2 (https://github.com/ytmdesktop/ytmdesktop/wiki/v2-%E2%80%90-Companion-Server-API-v1)
 from __future__ import annotations
-import logging, os, requests
+import os, requests
 from typing import Any, Optional
 from dotenv import load_dotenv
 from ytmusicapi import YTMusic
 
+import logging
+logger = logging.getLogger(__name__)
 load_dotenv()        # take environment variables from .env.
 
-'''Confusingly, YTMD app currenntly interfaces as the v2 api, but has v1 in the URL.'''
+'''Confusingly, YTMD app currently interfaces as the v2 api, but has v1 in the URL.'''
 
 __all__ = [
     "ytmd", "play_music", "stop_music", "next_track", "previous_track",
@@ -40,43 +42,57 @@ class YTMD:
     def _send(self, command: str, *, value: Optional[Any] = None) -> None:
         payload: dict[str, Any] = {"command": command}
         if value is not None:
-            payload["data"] = value              # ← Companion-Server expects “value”
+            payload["data"] = value
 
-        r = requests.post(
-            self._base_url,
-            json=payload,
-            headers=self._headers,
-            timeout=self.timeout,
-        )
-        r.raise_for_status()
-        logging.debug("YTMD → %s (%s)", command, value)
+        try:
+            r = requests.post(
+                self._base_url,
+                json=payload,
+                headers=self._headers,
+                timeout=self.timeout,
+            )
+            r.raise_for_status()
+        except requests.exceptions.Timeout as e:
+            logger.error("YTMD command %r timed out after %ss", command, self.timeout)
+            raise
+        except requests.exceptions.HTTPError as e:
+            # e.response.status_code is available if you need it
+            status = e.response.status_code if e.response else "??"
+            logger.error("YTMD command %r failed: HTTP %s", command, status)
+            raise
+        except requests.exceptions.RequestException as e:
+            logger.error("YTMD command %r connection error: %s", command, e)
+            raise
+        else:
+            logger.debug("YTMD → %s (%s)", command, value)
+
 
 
     def play_song(self, title: str, artist: str | None = None) -> None:
         """
-        Search YouTube Music for “title [+ artist]” and play the first match.
+        Search YouTube Music (actual) for “title [+ artist]” and play the first match.
         """
         # 1) Build and run the search
         query = f"{title} by {artist}" if artist else title
         from ytmusicapi import YTMusic
-        ytm = YTMusic()  # make sure you've already configured its auth
+        ytm = YTMusic()
         results = ytm.search(query, filter="songs", limit=1)
 
         if not results:
-            logging.error("No YTM results for %r", query)
+            logger.error("No YTM results for %r", query)
             return
 
         # 2) Pull out the videoId
         video_id = results[0].get("videoId")
         if not video_id:
-            logging.error("Search hit with no videoId: %r", results[0])
+            logger.error("Search hit with no videoId: %r", results[0])
             return
 
         # 3) Hit the Companion-Server
         #    You need {"command":"changeVideo","data":{…}}
         self._send("changeVideo",
                    value={"videoId": video_id, "playlistId": None})
-        logging.info("YTMD playing videoId %s", video_id)
+        logger.info("YTMD playing videoId %s", video_id)
 
 
     #  music control
@@ -90,7 +106,7 @@ class YTMD:
         self._send("next")
 
     def previous_track(self):
-        self._send("seekTo", value=4)
+        self._send("seekTo", value=4) # skips to 4 seconds (threshold for previous)
         self._send("previous")
 
     def restart_track(self):
@@ -108,7 +124,7 @@ class YTMD:
         try:
             vol = max(0, min(100, int(level)))
         except (ValueError, TypeError):
-            logging.error("Bad volume value: %s", level)
+            logger.error("Bad volume value: %s", level)
             return
         self._send("setVolume", value=vol)
 

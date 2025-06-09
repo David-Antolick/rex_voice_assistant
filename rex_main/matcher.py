@@ -25,12 +25,11 @@ import rex_main.commands as commands
 __all__ = ["dispatch_command"]
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
-# Common helpers
-_END   = r"[.!?\s]*$"              # optional trailing punctuation / spaces
-_WORD  = r"\s*"                    # optional surrounding spaces
+# Common helpers (for robustness)
+_END   = r"[.!?\s]*$"              # trailing punctuation / spaces
+_WORD  = r"\s*"                    # surrounding spaces
 
 COMMAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 
@@ -62,6 +61,7 @@ COMMAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 # Public coroutine
 async def dispatch_command(text_queue: "asyncio.Queue[str]"):  
     """Forever task that reads recognised text and triggers handlers."""
+    logger.info("dispatch_command started - awaiting recognized text")
 
     while True:
         text = (await text_queue.get()).strip()
@@ -77,7 +77,7 @@ async def dispatch_command(text_queue: "asyncio.Queue[str]"):
                 break
 
         if not matched:
-            logger.debug("No command matched: %s", text)
+            logger.debug("No command matched for input: %r", text)
 
         text_queue.task_done()
 
@@ -93,6 +93,6 @@ def _call_handler(func_name: str, args: tuple[str, ...]):
         return
 
     try:
-        func(*args)  # type: ignore[arg-type]
-    except Exception as exc:  # noqa: BLE001 – want broad catch for assistant safety
+        func(*args)
+    except Exception as exc:  # noqa: BLE001
         logger.exception("Error while executing '%s': %s", func_name, exc)
