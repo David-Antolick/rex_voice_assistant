@@ -50,6 +50,7 @@ class YTMD:
         r.raise_for_status()
         logging.debug("YTMD → %s (%s)", command, value)
 
+
     #  music control
     def play_music(self):
         self._send("play")
@@ -61,11 +62,13 @@ class YTMD:
         self._send("next")
 
     def previous_track(self):
-        self._send("previous")
+        self._send("seekTo", value=4)
         self._send("previous")
 
     def restart_track(self):
-        self._send("previous")  # rewind current
+        self._send("seekTo", value=5)  # skips to 5 seconds (threshold for restart)
+        self._send("previous")
+
 
     # volume 
     def volume_up(self):
@@ -80,6 +83,7 @@ class YTMD:
             logging.error("Bad volume value: %s", level)
             return
         self._send("setVolume", value=vol)
+
 
     # thumbs
     def like(self):

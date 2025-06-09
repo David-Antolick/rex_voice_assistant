@@ -45,8 +45,8 @@ COMMAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(rf"^{_WORD}restart{_WORD}{_END}", re.I), "restart_track"),
 
     # YTMD: volume control
-    (re.compile(rf"^{_WORD}turn up{_END}",   re.I), "volume_up"),
-    (re.compile(rf"^{_WORD}turn down{_END}", re.I), "volume_down"),
+    (re.compile(rf"^{_WORD}volume up{_END}",   re.I), "volume_up"),
+    (re.compile(rf"^{_WORD}volume down{_END}", re.I), "volume_down"),
     (re.compile(rf"^{_WORD}volume\s+(\d{{1,3}}){_WORD}{_END}", re.I), "set_volume"),
 
 
