@@ -7,3 +7,5 @@ models/*
 *.pyc
 *.env
 
+
+logs/rex_log.log

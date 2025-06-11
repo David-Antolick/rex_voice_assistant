@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from typing import Optional, Tuple
-
+from collections import deque
 import numpy as np
 import torch
 import logging
@@ -59,6 +59,7 @@ class SileroVAD:
         speech_threshold: float = 0.65,
         silence_ms: int = 750,
         max_utterance_ms: int = 10_000,
+        pre_speech_ms: int = 100
     ):
         self.in_q = in_queue
         self.out_q = out_queue
@@ -67,6 +68,8 @@ class SileroVAD:
         self.speech_th = speech_threshold
         self.silence_frames = silence_ms // frame_ms
         self.max_frames = max_utterance_ms // frame_ms
+        self.pre_speech_frames = pre_speech_ms // frame_ms
+        self._pre_buf = deque(maxlen=self.pre_speech_frames)
 
 
         # Show VAD params
@@ -89,9 +92,17 @@ class SileroVAD:
 
         while True:
             frame = await self.in_q.get()
+
+            if not speech_buf:
+                self._pre_buf.append(frame)
+
             speech_prob = self._infer(frame)
 
             if speech_prob >= self.speech_th:
+                if not speech_buf:
+                    # first real speech frame → prepend the buffer
+                    speech_buf.extend(self._pre_buf)
+                    self._pre_buf.clear()
                 speech_buf.append(frame)
                 silence_ctr = 0
             else:
@@ -109,6 +120,7 @@ class SileroVAD:
                         )
                         await self.out_q.put(utterance)
                         speech_buf.clear()
+                        self._pre_buf.clear()
                         silence_ctr = 0
 
             # clean up queue task tracking

@@ -135,6 +135,13 @@ class YTMD:
     def dislike(self):
         self._send("toggleDislike")
 
+    # memes
+    def so_sad(self):
+        """Send a 'so sad' command to YTMD."""
+        self._send("changeVideo",
+                   value={"videoId": 'FdMG84qN_98', "playlistId": None})
+        logger.info("YTMD playing videoId %s", 'FdMG84qN_98')
+
 
 # singleton + shims
 ytmd = YTMD()
@@ -152,3 +159,4 @@ set_volume     = ytmd.set_volume
 
 like           = ytmd.like
 dislike        = ytmd.dislike
+so_sad         = ytmd.so_sad

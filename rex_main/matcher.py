@@ -55,6 +55,10 @@ COMMAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(rf"^{_WORD}like{_WORD}{_END}",    re.I), "like"),
     (re.compile(rf"^{_WORD}dislike{_WORD}{_END}", re.I), "dislike"),
 
+    # YTMD: other commands
+    (re.compile(rf"^{_WORD}this\s+is\s+so\s+sad{_WORD}{_END}", re.I), "so_sad"),
+
+
 ]
 
 
