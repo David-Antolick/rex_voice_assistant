@@ -13,13 +13,18 @@ load_dotenv()        # take environment variables from .env.
 
 '''Confusingly, YTMD app currently interfaces as the v2 api, but has v1 in the URL.'''
 
-_all__ = [
-    "configure_service",
-    "play_music", "stop_music", "next_track", "previous_track",
-    # YTMD-only (currently):
-    "restart_track", "search_song", "volume_up", "volume_down",
-    "set_volume", "like", "dislike", "so_sad",
+__all__ = [
+  # mode switching
+  "configure_spotify", "configure_ytmd",
+  # shared
+  "play_music", "stop_music", "next_track", "previous_track",
+  "restart_track", "search_song", "volume_up", "volume_down",
+  "set_volume", "like", "dislike", "so_sad",
+  # Spotify-only
+  "shuffle_on", "shuffle_off", "set_repeat", "queue_track",
+  "current_track_info",
 ]
+
 
 
 
@@ -147,7 +152,6 @@ class YTMD:
 
     # memes
     def so_sad(self):
-        """Send a 'so sad' command to YTMD."""
         self._send("changeVideo",
                    value={"videoId": 'FdMG84qN_98', "playlistId": None})
         logger.info("YTMD playing videoId %s", 'FdMG84qN_98')
@@ -157,6 +161,12 @@ class YTMD:
 class SpotifyClient:
     """Control your desktop Spotify app via the Spotify Web API / Connect."""
     SCOPE = "user-modify-playback-state user-read-playback-state"
+    SCOPE = (
+        "user-modify-playback-state "
+        "user-read-playback-state "
+        "user-library-modify "
+        "user-library-read"
+    )
 
     def __init__(self):
         # this will pop open a browser on first run so you can log in
@@ -178,6 +188,20 @@ class SpotifyClient:
         )
         logger.info("Using Spotify Connect device %r", self.device_id)
 
+
+    def search_song(self, title: str, artist: str | None = None) -> None:
+        """Search Spotify for a track and play the first match."""
+        query = f"{title} {artist or ''}".strip()
+        results = self.sp.search(q=query, type="track", limit=1).get("tracks", {}).get("items", [])
+        if not results:
+            logger.error("Spotify search found no tracks for %r", query)
+            return
+        track_uri = results[0]["uri"]
+        self.sp.start_playback(device_id=self.device_id, uris=[track_uri])
+        logger.info("Spotify playing %s", track_uri)
+
+
+    # music control
     def play_music(self):
         self.sp.start_playback(device_id=self.device_id)
         logger.info("Spotify → play")
@@ -194,11 +218,109 @@ class SpotifyClient:
         self.sp.previous_track(device_id=self.device_id)
         logger.info("Spotify → previous")
 
+    def restart_track(self) -> None:
+        """Seek to the start of the current track."""
+        self.sp.seek_track(position_ms=0, device_id=self.device_id)
+        logger.info("Spotify restart")
+
+    
+    # volume control
+    def volume_up(self) -> None:
+        """Increase volume by 10% (clamped at 100)."""
+        current = self.sp.current_playback().get("device", {}).get("volume_percent", 50)
+        new = min(100, current + 10)
+        self.sp.volume(new, device_id=self.device_id)
+        logger.info("Spotify volume set to %d%%", new)
+
+    def volume_down(self) -> None:
+        """Decrease volume by 10% (floored at 0)."""
+        current = self.sp.current_playback().get("device", {}).get("volume_percent", 50)
+        new = max(0, current - 10)
+        self.sp.volume(new, device_id=self.device_id)
+        logger.info("Spotify volume set to %d%%", new)
+
+    def set_volume(self, level: int | str) -> None:
+        """Set volume to an exact 0–100%."""
+        try:
+            v = max(0, min(100, int(level)))
+        except (ValueError, TypeError):
+            logger.error("Bad volume value: %r", level)
+            return
+        self.sp.volume(v, device_id=self.device_id)
+        logger.info("Spotify volume set to %d%%", v)
+
+    
+    # thumbs
+    def like(self) -> None:
+        """Save the current track to Your Library."""
+        item = self.sp.current_user_playing_track().get("item")
+        if not item:
+            logger.error("No track playing to like")
+            return
+        self.sp.current_user_saved_tracks_add([item["id"]])
+        logger.info("Spotify liked %s", item["id"])
+
+    def dislike(self) -> None:
+        """Remove the current track from Your Library."""
+        item = self.sp.current_user_playing_track().get("item")
+        if not item:
+            logger.error("No track playing to dislike")
+            return
+        self.sp.current_user_saved_tracks_delete([item["id"]])
+        logger.info("Spotify disliked %s", item["id"])
+
+
+    # Unique to Spotify
+    def shuffle_on(self) -> None:
+        self.sp.shuffle(True, device_id=self.device_id)
+        logger.info("Spotify shuffle on")
+
+    def shuffle_off(self) -> None:
+        self.sp.shuffle(False, device_id=self.device_id)
+        logger.info("Spotify shuffle off")
+
+    def set_repeat(self, mode: str) -> None:
+        """
+        mode: one of "off", "context", or "track"
+        """
+        if mode not in ("off", "context", "track"):
+            logger.error("Invalid repeat mode: %r", mode)
+            return
+        self.sp.repeat(mode, device_id=self.device_id)
+        logger.info("Spotify repeat set to %s", mode)
+
+    def queue_track(self, query: str) -> None:
+        # search for the track title
+        results = (
+            self.sp.search(q=query, type="track", limit=1)
+            .get("tracks", {})
+            .get("items", [])
+        )
+        if not results:
+            logger.error("Spotify queue: no results for %r", query)
+            return
+        uri = results[0]["uri"]
+
+        # add to Spotify Connect queue
+        self.sp.add_to_queue(uri, device_id=self.device_id)
+        logger.info("Spotify queued %s", uri)
+
+
+    def current_track_info(self) -> dict:
+        """Return metadata about the current playing item."""
+        info = self.sp.current_user_playing_track() or {}
+        logger.info("Spotify current playback info: %s", info)
+        return info    
+
+
+    # Memes
+    def so_sad(self) -> None:
+        sad_uri = "spotify:track:6rPO02ozF3bM7NnOV4h6s2"  
+        self.sp.start_playback(device_id=self.device_id, uris=[sad_uri])
+        logger.info("Don't cry!", sad_uri)
 
 
 
-ytmd = YTMD()
-sp = SpotifyClient()
 
 current_service = None
 
@@ -208,12 +330,12 @@ def configure_service(mode: str):
     to either YTMD or SpotifyClient, based on `mode`.
     """
     global current_service, play_music, stop_music, next_track, previous_track, \
-              restart_track, search_song, volume_up, volume_down, set_volume, \
-                like, dislike, so_sad
+            restart_track, search_song, volume_up, volume_down, set_volume, like,\
+             dislike, so_sad, shuffle_on, shuffle_off, set_repeat, queue_track, current_track_info
 
     current_service = mode.lower()
     if current_service == "ytmd":
-        client = ytmd
+        client = YTMD()
         play_music     = client.play_music
         stop_music     = client.stop_music
         next_track     = client.next_track
@@ -231,11 +353,29 @@ def configure_service(mode: str):
         so_sad         = client.so_sad
 
     elif current_service == "spotify":
-        client = sp
+        client = SpotifyClient()
         play_music    = client.play_music
         stop_music    = client.stop_music
         next_track    = client.next_track
         previous_track= client.previous_track
+        restart_track = client.restart_track
+
+        search_song   = client.search_song
+
+        volume_up     = client.volume_up
+        volume_down   = client.volume_down
+        set_volume    = client.set_volume
+
+        like          = client.like
+        dislike       = client.dislike
+
+        shuffle_on    = client.shuffle_on
+        shuffle_off   = client.shuffle_off
+        set_repeat    = client.set_repeat
+        queue_track   = client.queue_track
+        current_track_info = client.current_track_info
+
+        so_sad         = client.so_sad
 
     else:
         raise ValueError(f"Unknown service mode: {mode!r}")

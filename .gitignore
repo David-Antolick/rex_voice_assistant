@@ -8,6 +8,5 @@ models/*
 *.env
 
 
-logs/rex_log.log
 
 *.cache

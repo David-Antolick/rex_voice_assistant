@@ -33,33 +33,39 @@ _WORD  = r"\s*"                    # surrounding spaces
 
 COMMAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 
-    # YTMD: play / pause
+    # Music commands
+    #  play / pause
     (re.compile(rf"^{_WORD}stop\s+music{_WORD}{_END}",  re.I), "stop_music"),
     (re.compile(rf"^{_WORD}play\s+music{_WORD}{_END}", re.I), "play_music"),
 
 
-    # YTMD: track navigation
+    #  track navigation
     (re.compile(rf"^{_WORD}(?:next|skip){_WORD}{_END}", re.I), "next_track"),
     (re.compile(rf"^{_WORD}(?:last|previous){_WORD}{_END}", re.I), "previous_track"),
     (re.compile(rf"^{_WORD}restart{_WORD}{_END}", re.I), "restart_track"),
     (re.compile(rf"^{_WORD}search\s+(.+?)(?:\s+by\s+(.+?))?{_END}", re.I), "search_song"),
 
 
-    # YTMD: volume control
+    #  volume control
     (re.compile(rf"^{_WORD}volume up{_END}",   re.I), "volume_up"),
     (re.compile(rf"^{_WORD}volume down{_END}", re.I), "volume_down"),
     (re.compile(rf"^{_WORD}volume\s+(\d{{1,3}}){_WORD}{_END}", re.I), "set_volume"),
 
 
-    # YTMD: like / dislike
+    #  like / dislike
     (re.compile(rf"^{_WORD}like{_WORD}{_END}",    re.I), "like"),
     (re.compile(rf"^{_WORD}dislike{_WORD}{_END}", re.I), "dislike"),
 
-    # YTMD: other commands
+    #  Others commands
     (re.compile(rf"^{_WORD}this\s+is\s+so\s+sad{_WORD}{_END}", re.I), "so_sad"),
+    (re.compile(rf"^{_WORD}shuffle\s+on{_END}", re.I),  "shuffle_on"),
+    (re.compile(rf"^{_WORD}shuffle\s+off{_END}", re.I), "shuffle_off"),
+    (re.compile(rf"^{_WORD}repeat\s+(off|context|track){_END}", re.I), "set_repeat"),       # captures “off”, “context”, or “track”)
+    (re.compile(rf"^{_WORD}next\s+track(?:\s*[,;:]\s*|\s+)(.+?){_END}", re.I), "queue_track"),  # Queue a specific URI (e.g. “next track (song name)”) 
+    (re.compile(rf"^{_WORD}(?:what(?:'s)?\s+playing|current\s+track\s+info|track\s+info){_END}",re.I), "current_track_info"),
 
     
-    # Switching to other apps
+    #  Switching music apps (spotify, youtube music)
     (re.compile(rf"^{_WORD}switch\s+to\s+spotify{_END}", re.I), "configure_spotify"),
     (re.compile(rf"^{_WORD}switch\s+to\s+youtube\s+music{_END}", re.I), "configure_ytmd"),
 
