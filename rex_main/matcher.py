@@ -42,7 +42,7 @@ COMMAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(rf"^{_WORD}(?:next|skip){_WORD}{_END}", re.I), "next_track"),
     (re.compile(rf"^{_WORD}(?:last|previous){_WORD}{_END}", re.I), "previous_track"),
     (re.compile(rf"^{_WORD}restart{_WORD}{_END}", re.I), "restart_track"),
-    (re.compile(rf"^{_WORD}search\s+(.+?)(?:\s+by\s+(.+?))?{_END}", re.I), "play_song"),
+    (re.compile(rf"^{_WORD}search\s+(.+?)(?:\s+by\s+(.+?))?{_END}", re.I), "search_song"),
 
 
     # YTMD: volume control
@@ -58,6 +58,10 @@ COMMAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # YTMD: other commands
     (re.compile(rf"^{_WORD}this\s+is\s+so\s+sad{_WORD}{_END}", re.I), "so_sad"),
 
+    
+    # Switching to other apps
+    (re.compile(rf"^{_WORD}switch\s+to\s+spotify{_END}", re.I), "configure_spotify"),
+    (re.compile(rf"^{_WORD}switch\s+to\s+youtube\s+music{_END}", re.I), "configure_ytmd"),
 
 ]
 

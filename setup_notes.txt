@@ -6,6 +6,8 @@ Connecting audio (no idea if this would work vpn into server, probably not):
 - this should work with that then for audio streaming through default
 
 
+YOUTUBE MUSIC
+
 Connecting to youtube music (desktop app, likely not adding browser functionality)
 - Download here: https://ytmdesktop.app (github: https://github.com/ytmdesktop/ytmdesktop)
 - go into settings (gear in the top right of app)
@@ -27,4 +29,23 @@ curl -X POST http://host.docker.internal:9863/api/v1/auth/request \
   -d '{"appId":"rex_voice_assistant","code":"THE_CODE_YOU_JUST_GOT"}'
 -> { "token": "ea845423977fcbe9535547db2c09134b5087c352..." }
 
-set token in a .env file with other info and you're all setup
+
+
+SPOTIFY:
+Go to to setup app https://developer.spotify.com/dashboard
+  - Name is Rex, and callback URL should be http://127.0.0.1:8888/callback (port 8888 is already forwarded to this container)
+  - only webAPI access is needed currently
+
+This should take you to a page where you can get your (don't share these):
+  - client ID
+  - Client secret 
+
+Set any and all tokens in a .env as such:
+YTMD_TOKEN = "<TOKEN>"
+YTMD_HOST  = "host.docker.internal"
+YTMD_PORT  = "9863"
+
+# Spotify API credentials
+SPOTIPY_CLIENT_ID     = "<ID>"
+SPOTIPY_CLIENT_SECRET = "<SECRET>"
+SPOTIPY_REDIRECT_URI  = "http://127.0.0.1:8888/callback"

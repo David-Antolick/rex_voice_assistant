@@ -11,6 +11,8 @@
   "source=${localWorkspaceFolder}/pulse_conf/client.conf,target=/etc/pulse/client.conf,type=bind,consistency=delegated"
   ],
 
+  "forwardPorts": [8888],
+
   "containerEnv": {
   "HF_HOME": "/workspaces/rex_voice_assistant/models",
   "HF_MODEL_HOME": "/workspaces/rex_voice_assistant/models"

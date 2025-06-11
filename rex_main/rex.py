@@ -3,7 +3,7 @@ Entry-point for the REX voice assistant.
 
 Run inside the dev-container (with PulseAudio / CUDA exposed):
 
-    python -m rex  # or simply `python rex.py`
+    python -m rex_main.rex
 
 Press **Ctrl-C** to exit cleanly.
 """
@@ -37,7 +37,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     )
     p.add_argument(
         "--device",
-        default=None,
+        default="cuda",
         choices=["cuda", "cpu", None],
         help="Force device; default=auto",
     )

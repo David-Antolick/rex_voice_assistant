@@ -4,6 +4,8 @@ import os, requests
 from typing import Any, Optional
 from dotenv import load_dotenv
 from ytmusicapi import YTMusic
+from spotipy import Spotify
+from spotipy.oauth2 import SpotifyOAuth
 
 import logging
 logger = logging.getLogger(__name__)
@@ -11,11 +13,19 @@ load_dotenv()        # take environment variables from .env.
 
 '''Confusingly, YTMD app currently interfaces as the v2 api, but has v1 in the URL.'''
 
-__all__ = [
-    "ytmd", "play_music", "stop_music", "next_track", "previous_track",
-    "restart_track", "volume_up", "volume_down", "set_volume",
-    "like", "dislike",
+_all__ = [
+    "configure_service",
+    "play_music", "stop_music", "next_track", "previous_track",
+    # YTMD-only (currently):
+    "restart_track", "search_song", "volume_up", "volume_down",
+    "set_volume", "like", "dislike", "so_sad",
 ]
+
+
+
+
+
+
 
 class YTMD:
     """Thin client for YT Music Desktop Companion-Server (POST /api/v1/command)."""
@@ -38,7 +48,7 @@ class YTMD:
             self._headers["Authorization"] = self.token
 
 
-    #  low-level helper
+    #  helper
     def _send(self, command: str, *, value: Optional[Any] = None) -> None:
         payload: dict[str, Any] = {"command": command}
         if value is not None:
@@ -68,7 +78,7 @@ class YTMD:
 
 
 
-    def play_song(self, title: str, artist: str | None = None) -> None:
+    def search_song(self, title: str, artist: str | None = None) -> None:
         """
         Search YouTube Music (actual) for “title [+ artist]” and play the first match.
         """
@@ -143,20 +153,105 @@ class YTMD:
         logger.info("YTMD playing videoId %s", 'FdMG84qN_98')
 
 
-# singleton + shims
+
+class SpotifyClient:
+    """Control your desktop Spotify app via the Spotify Web API / Connect."""
+    SCOPE = "user-modify-playback-state user-read-playback-state"
+
+    def __init__(self):
+        # this will pop open a browser on first run so you can log in
+        auth = SpotifyOAuth(
+            scope=self.SCOPE,
+            open_browser=True,        # opens host browser via redirect
+            show_dialog=True,         # force login every time until token cached
+        )
+        self.sp = Spotify(auth_manager=auth)
+
+        # pick your desktop app as the playback target
+        devices = self.sp.devices().get("devices", [])
+        if not devices:
+            raise RuntimeError("No Spotify Connect devices found.")
+        # find the one named “Your Computer” or just take the first
+        self.device_id = next(
+            (d["id"] for d in devices if "Computer" in d["name"]),
+            devices[0]["id"]
+        )
+        logger.info("Using Spotify Connect device %r", self.device_id)
+
+    def play_music(self):
+        self.sp.start_playback(device_id=self.device_id)
+        logger.info("Spotify → play")
+
+    def stop_music(self):
+        self.sp.pause_playback(device_id=self.device_id)
+        logger.info("Spotify → pause")
+
+    def next_track(self):
+        self.sp.next_track(device_id=self.device_id)
+        logger.info("Spotify → next")
+
+    def previous_track(self):
+        self.sp.previous_track(device_id=self.device_id)
+        logger.info("Spotify → previous")
+
+
+
+
 ytmd = YTMD()
+sp = SpotifyClient()
 
-play_music     = ytmd.play_music
-stop_music     = ytmd.stop_music
-next_track     = ytmd.next_track
-previous_track = ytmd.previous_track
-restart_track  = ytmd.restart_track
-play_song      = ytmd.play_song
+current_service = None
 
-volume_up      = ytmd.volume_up
-volume_down    = ytmd.volume_down
-set_volume     = ytmd.set_volume
+def configure_service(mode: str):
+    """
+    Bind play_music, stop_music, next_track, previous_track
+    to either YTMD or SpotifyClient, based on `mode`.
+    """
+    global current_service, play_music, stop_music, next_track, previous_track, \
+              restart_track, search_song, volume_up, volume_down, set_volume, \
+                like, dislike, so_sad
 
-like           = ytmd.like
-dislike        = ytmd.dislike
-so_sad         = ytmd.so_sad
+    current_service = mode.lower()
+    if current_service == "ytmd":
+        client = ytmd
+        play_music     = client.play_music
+        stop_music     = client.stop_music
+        next_track     = client.next_track
+        previous_track = client.previous_track
+        restart_track  = client.restart_track
+
+        search_song      = client.search_song
+
+        volume_up      = client.volume_up
+        volume_down    = client.volume_down
+        set_volume     = client.set_volume
+
+        like           = client.like
+        dislike        = client.dislike
+        so_sad         = client.so_sad
+
+    elif current_service == "spotify":
+        client = sp
+        play_music    = client.play_music
+        stop_music    = client.stop_music
+        next_track    = client.next_track
+        previous_track= client.previous_track
+
+    else:
+        raise ValueError(f"Unknown service mode: {mode!r}")
+
+    logger.info("Media service configured to %s", current_service)
+
+
+
+# Wrapper functions for switching services
+def configure_spotify():
+    """Switch into Spotify mode (for matcher)."""
+    configure_service("spotify")
+
+def configure_ytmd():
+    """Switch back to YouTube Music mode (for matcher)."""
+    configure_service("ytmd")
+
+# initialize default
+configure_service("ytmd")

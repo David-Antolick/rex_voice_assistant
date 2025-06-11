@@ -9,3 +9,5 @@ models/*
 
 
 logs/rex_log.log
+
+*.cache
