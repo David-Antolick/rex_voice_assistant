@@ -49,3 +49,11 @@ YTMD_PORT  = "9863"
 SPOTIPY_CLIENT_ID     = "<ID>"
 SPOTIPY_CLIENT_SECRET = "<SECRET>"
 SPOTIPY_REDIRECT_URI  = "http://127.0.0.1:8888/callback"
+
+
+
+
+Issues:
+User doesn't have git, pulse audio, or other fun peripheries
+
+setting up spotify sometimes has break, no idea why. possible port forwarding issues. Will hopefully address soon.
