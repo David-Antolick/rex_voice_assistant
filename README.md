@@ -20,8 +20,8 @@ pip install -r requirements.txt
 
 # Follow setup outline in notes.txt
 
-# Run with verbose logs to console and a rotating file
-python -m rex_main --debug --log-file rex.log
+# Run 
+python -m rex_main.rex
 ```
 
 > **Tip:** use `--help` to see model size, beam, and port overrides.
