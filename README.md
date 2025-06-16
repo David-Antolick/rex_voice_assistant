@@ -13,19 +13,21 @@
 ### Quick start
 
 ```bash
-git clone https://github.com/your-name/rex
-cd rex
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+git https://github.com/David-Antolick/rex_voice_assistant.git
+cd rex_voice_assistant
+
 
 # Follow setup outline in notes.txt
+
+# Rebuild in dev container
+
+# You will have to click approve on the spotify pop-up multiple times
 
 # Run 
 python -m rex_main.rex
 ```
 
-> **Tip:** use `--help` to see model size, beam, and port overrides.
-
+> **Tip:** Default model size is set to small english, and beam 1.  If you have space issues, try tiny but accuracy will decrease.
 ---
 
 ### Built-in voice commands
