@@ -41,10 +41,7 @@ The project is optimized for Windows with a local PulseAudio server and optional
 ```powershell
 git clone https://github.com/David-Antolick/rex_voice_assistant.git
 cd rex_voice_assistant
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install --upgrade pip
-pip install -r requirements.txt
+enter dev container
 ```
 
 Notes:
