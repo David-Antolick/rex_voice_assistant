@@ -2,20 +2,18 @@
 from __future__ import annotations
 import os, requests
 from typing import Any, Optional
-from dotenv import load_dotenv
 from ytmusicapi import YTMusic
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 
 import logging
 logger = logging.getLogger(__name__)
-load_dotenv()        # take environment variables from .env.
 
 '''Confusingly, YTMD app currently interfaces as the v2 api, but has v1 in the URL.'''
 
 __all__ = [
   # mode switching
-  "configure_spotify", "configure_ytmd",
+  "configure_spotify", "configure_ytmd", "configure_from_config",
   # shared
   "play_music", "stop_music", "next_track", "previous_track",
   "restart_track", "search_song", "volume_up", "volume_down",
@@ -377,11 +375,84 @@ def configure_service(mode: str):
 
         so_sad         = client.so_sad
 
+    elif current_service == "none":
+        # No-op stubs for transcription-only mode
+        def _noop(*args, **kwargs):
+            logger.warning("No music service configured. Run 'rex setup' to configure.")
+
+        def _noop_search(title: str, artist: str | None = None):
+            logger.warning("No music service configured. Run 'rex setup' to configure.")
+
+        def _noop_info() -> dict:
+            logger.warning("No music service configured. Run 'rex setup' to configure.")
+            return {}
+
+        play_music     = _noop
+        stop_music     = _noop
+        next_track     = _noop
+        previous_track = _noop
+        restart_track  = _noop
+        search_song    = _noop_search
+        volume_up      = _noop
+        volume_down    = _noop
+        set_volume     = _noop
+        like           = _noop
+        dislike        = _noop
+        so_sad         = _noop
+        shuffle_on     = _noop
+        shuffle_off    = _noop
+        set_repeat     = _noop
+        queue_track    = _noop
+        current_track_info = _noop_info
+
+        logger.warning("Running in transcription-only mode (no music service configured)")
+        return
+
     else:
         raise ValueError(f"Unknown service mode: {mode!r}")
 
     logger.info("Media service configured to %s", current_service)
 
+
+def configure_from_config(config: dict) -> None:
+    """Configure the music service from a configuration dictionary.
+
+    Args:
+        config: Configuration dictionary with services.active, secrets, etc.
+    """
+    from rex_main.config import get_secrets
+
+    secrets = get_secrets(config)
+    active_service = config.get("services", {}).get("active", "none")
+
+    if active_service == "ytmd":
+        # Set environment variables for YTMD class to pick up
+        ytmd_config = config.get("services", {}).get("ytmd", {})
+
+        if secrets.get("ytmd_token"):
+            os.environ["YTMD_TOKEN"] = secrets["ytmd_token"]
+        if ytmd_config.get("host"):
+            os.environ["YTMD_HOST"] = ytmd_config["host"]
+        if ytmd_config.get("port"):
+            os.environ["YTMD_PORT"] = str(ytmd_config["port"])
+
+        configure_service("ytmd")
+
+    elif active_service == "spotify":
+        # Set environment variables for SpotifyClient to pick up
+        spotify_config = config.get("services", {}).get("spotify", {})
+
+        if secrets.get("spotify_client_id"):
+            os.environ["SPOTIPY_CLIENT_ID"] = secrets["spotify_client_id"]
+        if secrets.get("spotify_client_secret"):
+            os.environ["SPOTIPY_CLIENT_SECRET"] = secrets["spotify_client_secret"]
+        if spotify_config.get("redirect_uri"):
+            os.environ["SPOTIPY_REDIRECT_URI"] = spotify_config["redirect_uri"]
+
+        configure_service("spotify")
+
+    else:
+        configure_service("none")
 
 
 # Wrapper functions for switching services
@@ -393,5 +464,20 @@ def configure_ytmd():
     """Switch back to YouTube Music mode (for matcher)."""
     configure_service("ytmd")
 
-# initialize default
-configure_service("ytmd")
+
+# Defer service initialization - will be configured by CLI or run_assistant
+# This prevents errors when importing the module before config is ready
+_service_initialized = False
+
+def _ensure_service_initialized():
+    """Initialize service if not already done (for backwards compatibility)."""
+    global _service_initialized
+    if not _service_initialized:
+        # Try to load config, fall back to "none" if not available
+        try:
+            from rex_main.config import load_config
+            config = load_config()
+            configure_from_config(config)
+        except Exception:
+            configure_service("none")
+        _service_initialized = True

@@ -37,13 +37,24 @@ class AudioStream:
         Target sampling rate (Hz).  Make sure downstream models agree.
     frame_ms : int, default 32
         Duration of each frame in milliseconds. Must be consistent with VAD framework.
+    pulse_server : str, optional
+        PulseAudio server address (e.g., "tcp:localhost:4713"). If provided, sets
+        PULSE_SERVER environment variable before spawning ffmpeg.
     """
 
-    def __init__(self, queue: asyncio.Queue, *, samplerate: int = 16_000, frame_ms: int = 32):
+    def __init__(
+        self,
+        queue: asyncio.Queue,
+        *,
+        samplerate: int = 16_000,
+        frame_ms: int = 32,
+        pulse_server: Optional[str] = None,
+    ):
         self.queue = queue
         self.samplerate = samplerate
         self.frame_len = int(samplerate * frame_ms / 1000)
         self.frame_ms = frame_ms
+        self.pulse_server = pulse_server
         self._stream: Optional[sd.InputStream] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._stop_evt = asyncio.Event()
@@ -70,19 +81,25 @@ class AudioStream:
         We use PulseAudio's 'default' source and write 16-bit little-endian
         PCM to stdout so no temporary files are created.
         """
-
+        import os
 
         # show configured frame size & rates
         logger.debug(
             "AudioStream starting: samplerate=%d Hz, frame_ms=%d ms → frame_len=%d samples",
              self.samplerate, self.frame_ms, self.frame_len,
-        )   
-        
+        )
+
+        # Set PULSE_SERVER environment variable if pulse_server is configured
+        env = os.environ.copy()
+        if self.pulse_server:
+            env["PULSE_SERVER"] = self.pulse_server
+            logger.debug("Using PulseAudio server: %s", self.pulse_server)
+
         # inspect sounddevice input config
         default_input, _ = sd.default.device
 
         if default_input is None or default_input < 0:
-            # you’re using ffmpeg’s “default” source, so sounddevice hasn’t picked one
+            # you're using ffmpeg's "default" source, so sounddevice hasn't picked one
             logger.debug(
                 "No sounddevice default input device (got %s); FFmpeg default will be used",
                 default_input,
@@ -90,8 +107,8 @@ class AudioStream:
             # list actual hardware mics in case you want to bind one later
             devices = sd.query_devices()
             inputs = [
-                (i, d["name"]) 
-                for i, d in enumerate(devices) 
+                (i, d["name"])
+                for i, d in enumerate(devices)
                 if d.get("max_input_channels", 0) > 0
             ]
             logger.debug("Available input devices: %s", inputs)
@@ -127,7 +144,8 @@ class AudioStream:
         self._proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            bufsize=0  # unbuffered
+            bufsize=0,  # unbuffered
+            env=env,    # pass modified environment with PULSE_SERVER
         )
 
         if self._proc.stdout is None:

@@ -1,0 +1,22 @@
+audio:
+  sample_rate: 16000
+  frame_ms: 32
+  pulse_server: "tcp:localhost:4713"
+
+model:
+  name: "small.en"
+  device: "auto"
+  beam_size: 1
+  cache_dir: "~/.rex/models"
+
+services:
+  active: "none"  # none | ytmd | spotify
+  ytmd:
+    host: "localhost"
+    port: 9863
+  spotify:
+    redirect_uri: "http://127.0.0.1:8888/callback"
+
+logging:
+  level: "INFO"
+  file: "~/.rex/logs/rex.log"

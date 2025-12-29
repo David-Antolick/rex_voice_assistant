@@ -1,8 +1,12 @@
 """rex.py
 Entry-point for the REX voice assistant.
 
-Run inside the dev-container (with PulseAudio / CUDA exposed):
+Run with the CLI:
+    rex           # Start the assistant
+    rex setup     # Interactive setup wizard
+    rex status    # Show configuration status
 
+Or directly:
     python -m rex_main.rex
 
 Press **Ctrl-C** to exit cleanly.
@@ -13,8 +17,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import signal
+import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 import numpy as np
 
 from rex_main.audio_stream import AudioStream
@@ -63,9 +68,13 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
 # Main orchestration
 
-async def main(opts: argparse.Namespace):
+async def run_assistant(opts: Any, config: Optional[dict] = None):
+    """Main entry-point coroutine for the voice assistant.
 
-    """Main entry-point coroutine."""
+    Args:
+        opts: Options object with model, device, beam, log_file, debug attributes
+        config: Optional configuration dictionary (used for pulse_server, etc.)
+    """
 
    # ___ Logging setup ___
     root = logging.getLogger()
@@ -102,12 +111,34 @@ async def main(opts: argparse.Namespace):
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
     # ___ End logging setup ___
 
+    # Check service configuration and show startup info
+    active_service = "none"
+    if config:
+        active_service = config.get("services", {}).get("active", "none")
+
+    logger.info("=" * 50)
+    logger.info("REX Voice Assistant starting...")
+    logger.info("Model: %s | Device: %s | Beam: %d", opts.model, opts.device, opts.beam)
+    logger.info("Active service: %s", active_service)
+
+    if active_service == "none":
+        logger.warning("No music service configured - running in transcription-only mode")
+        logger.warning("Run 'rex setup' to configure YTMD or Spotify")
+
+    logger.info("=" * 50)
+    logger.info("Listening... (Press Ctrl+C to exit)")
+
     # Queues
     audio_q: "asyncio.Queue[np.ndarray]" = asyncio.Queue(maxsize=50)
     speech_q: "asyncio.Queue[np.ndarray]" = asyncio.Queue(maxsize=10)
     text_q: "asyncio.Queue[str]" = asyncio.Queue(maxsize=10)
 
-    async with AudioStream(audio_q):
+    # Get pulse_server from config if available
+    pulse_server = None
+    if config:
+        pulse_server = config.get("audio", {}).get("pulse_server")
+
+    async with AudioStream(audio_q, pulse_server=pulse_server):
         vad = SileroVAD(audio_q, speech_q)
         whisper = WhisperWorker(
             speech_q,
@@ -124,8 +155,10 @@ async def main(opts: argparse.Namespace):
         ]
 
         # Handle Ctrl-C for graceful shutdown
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            asyncio.get_running_loop().add_signal_handler(sig, _cancel_tasks, tasks)
+        # Note: add_signal_handler doesn't work on Windows, but KeyboardInterrupt is caught
+        if sys.platform != "win32":
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                asyncio.get_running_loop().add_signal_handler(sig, _cancel_tasks, tasks)
 
         # Wait until the first task raises (ideally never) or is cancelled
         try:
@@ -141,6 +174,10 @@ def _cancel_tasks(tasks: list[asyncio.Task]):
         t.cancel()
 
 
+# Legacy alias for backwards compatibility
+main = run_assistant
+
+
 # Entry-point
 if __name__ == "__main__":
-    asyncio.run(main(parse_args()))
+    asyncio.run(run_assistant(parse_args()))
