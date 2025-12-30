@@ -42,9 +42,9 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     )
     p.add_argument(
         "--device",
-        default="cuda",
-        choices=["cuda", "cpu", None],
-        help="Force device; default=auto",
+        default="auto",
+        choices=["cuda", "cpu", "auto"],
+        help="Device for Whisper model (auto will use CPU unless --device cuda is explicit)",
     )
     p.add_argument(
         "--beam",

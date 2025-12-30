@@ -12,7 +12,7 @@ import os
 from typing import Optional
 
 import numpy as np
-from faster_whisper import WhisperModel, utils as fw_utils  
+from faster_whisper import WhisperModel
 import time
 
 import logging
@@ -54,7 +54,16 @@ class WhisperWorker:
         self.in_q = in_queue
         self.out_q = out_queue
         self.model_name = model_name
-        self.device = device or ("cuda" if fw_utils.has_cuda() else "cpu")
+
+        # Handle device selection:
+        # - "auto" or None: default to CPU (safe, avoids cuDNN compatibility issues)
+        # - "cuda": try CUDA (user explicitly requested it)
+        # - "cpu": use CPU
+        if device in (None, "auto"):
+            self.device = "cpu"
+        else:
+            self.device = device
+
         self.compute_type = compute_type if self.device == "cuda" else "float32"
         self.beam_size = beam_size
 
@@ -111,6 +120,9 @@ class WhisperWorker:
                 compute_type=compute_type,
                 download_root=os.getenv("HF_MODEL_HOME", "/tmp/hf_models"),
             )
+            # Test transcription to catch cuDNN errors that only appear at inference time
+            if device == "cuda":
+                self._test_inference()
         except Exception as e:
             if device == "cuda":
                 logger.warning("CUDA initialization failed: %s", e)
@@ -134,6 +146,19 @@ class WhisperWorker:
             "Loaded WhisperModel '%s' on %s [%s]",
             self.model_name, self.device, self.compute_type,
         )
+
+    def _test_inference(self):
+        """Run a tiny test transcription to verify CUDA/cuDNN actually works."""
+        # Generate 0.1 seconds of silence for a quick test
+        test_audio = np.zeros(1600, dtype=np.float32)
+        # This will throw if cuDNN is broken
+        segments, _ = self._model.transcribe(
+            test_audio,
+            beam_size=1,
+            language="en",
+        )
+        # Force generator to execute
+        list(segments)
 
     # called in threadpool so can be blocking/heavy
     def _transcribe(self, pcm: np.ndarray) -> str:

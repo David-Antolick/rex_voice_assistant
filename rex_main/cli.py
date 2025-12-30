@@ -26,7 +26,7 @@ console = Console()
 
 @click.group(invoke_without_command=True)
 @click.option("--model", default="small.en", help="Whisper model size (tiny|base|small|medium|large)")
-@click.option("--device", default="cuda", type=click.Choice(["cuda", "cpu"]), help="Device for inference")
+@click.option("--device", default="auto", type=click.Choice(["cuda", "cpu", "auto"]), help="Device for inference (auto=CPU, use cuda for GPU)")
 @click.option("--beam", default=1, type=int, help="Beam size for Whisper decoding")
 @click.option("--log-file", default=None, help="Path to write rotating logs")
 @click.option("--debug", is_flag=True, help="Enable verbose logging")
@@ -62,7 +62,7 @@ def run(ctx: click.Context):
 
     opts = Options()
     opts.model = ctx.obj.get("model") or config.get("model", {}).get("name", "small.en")
-    opts.device = ctx.obj.get("device") or config.get("model", {}).get("device", "cuda")
+    opts.device = ctx.obj.get("device") or config.get("model", {}).get("device", "auto")
     opts.beam = ctx.obj.get("beam") or config.get("model", {}).get("beam_size", 1)
     opts.log_file = ctx.obj.get("log_file") or get_log_file_path(config)
     opts.debug = ctx.obj.get("debug", False)
