@@ -237,7 +237,7 @@ def _offer_cuda_setup():
 
             if result.returncode != 0:
                 progress.update(task, description="[red]Installation failed[/red]")
-                console.print(f"\n[red]Error installing PyTorch:[/red]")
+                console.print("\n[red]Error installing PyTorch:[/red]")
                 console.print(f"[dim]{result.stderr}[/dim]")
                 console.print("\n[yellow]You can try manually with:[/yellow]")
                 console.print("  pipx runpip rex-voice-assistant install torch --index-url https://download.pytorch.org/whl/cu124 --force-reinstall")
@@ -539,7 +539,7 @@ def _setup_model():
             from faster_whisper import WhisperModel
 
             # This will download if not cached
-            model = WhisperModel(model_name, device="cpu", compute_type="int8")
+            _ = WhisperModel(model_name, device="cpu", compute_type="int8")
 
             progress.update(task, description="Model downloaded!")
 
@@ -583,7 +583,7 @@ def _test_audio():
         rms = np.sqrt(np.mean(audio**2))
 
         if max_level > 0.01:
-            console.print(f"[green]Audio captured successfully![/green]")
+            console.print("[green]Audio captured successfully![/green]")
             console.print(f"  Peak level: {max_level:.2%}")
             console.print(f"  RMS level: {rms:.2%}")
         else:
@@ -637,7 +637,7 @@ def _write_config(services: list[str], secrets: dict):
     # Save secrets
     if secrets:
         save_secrets(secrets)
-        console.print(f"  Secrets saved securely")
+        console.print("  Secrets saved securely")
 
     console.print("[green]Configuration complete![/green]")
 

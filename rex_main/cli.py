@@ -126,7 +126,7 @@ def status():
 
     # Config file location
     config_file = CONFIG_DIR / "config.yaml"
-    console.print(f"\n[bold]Configuration:[/bold]")
+    console.print("\n[bold]Configuration:[/bold]")
     console.print(f"  Config file: {config_file} ({'exists' if config_file.exists() else '[red]not found[/red]'})")
 
     # Active service
@@ -135,7 +135,7 @@ def status():
 
     # Model settings
     model_cfg = config.get("model", {})
-    console.print(f"\n[bold]Model:[/bold]")
+    console.print("\n[bold]Model:[/bold]")
     console.print(f"  Name: {model_cfg.get('name', 'small.en')}")
     console.print(f"  Device: {model_cfg.get('device', 'auto')}")
 
@@ -161,8 +161,8 @@ def status():
                 ytmd_status = "[green]Connected[/green]"
             else:
                 ytmd_status = f"[red]Error ({resp.status_code})[/red]"
-        except Exception as e:
-            ytmd_status = f"[red]Offline[/red]"
+        except Exception:
+            ytmd_status = "[red]Offline[/red]"
     table.add_row("YouTube Music Desktop", ytmd_configured, ytmd_status)
 
     # Spotify status
@@ -176,7 +176,7 @@ def status():
 
     # Audio settings
     audio_cfg = config.get("audio", {})
-    console.print(f"\n[bold]Audio:[/bold]")
+    console.print("\n[bold]Audio:[/bold]")
     console.print(f"  Sample rate: {audio_cfg.get('sample_rate', 16000)} Hz")
 
     # Show audio device info
@@ -187,9 +187,9 @@ def status():
             dev_info = sd.query_devices(default_input)
             console.print(f"  Input device: {dev_info['name']}")
         else:
-            console.print(f"  Input device: [yellow]No default set[/yellow]")
+            console.print("  Input device: [yellow]No default set[/yellow]")
     except Exception:
-        console.print(f"  Input device: [yellow]Could not detect[/yellow]")
+        console.print("  Input device: [yellow]Could not detect[/yellow]")
 
 
 @cli.command()
@@ -258,7 +258,7 @@ def test(service: str):
 
             # Try to get current user
             user = sp.current_user()
-            console.print(f"[green]Connected successfully![/green]")
+            console.print("[green]Connected successfully![/green]")
             console.print(f"  Logged in as: {user.get('display_name', user.get('id'))}")
 
             # Check for active devices

@@ -1,6 +1,7 @@
 # commands.py  – v2 (https://github.com/ytmdesktop/ytmdesktop/wiki/v2-%E2%80%90-Companion-Server-API-v1)
 from __future__ import annotations
-import os, requests
+import os
+import requests
 from typing import Any, Optional
 from ytmusicapi import YTMusic
 from spotipy import Spotify
@@ -65,7 +66,7 @@ class YTMD:
                 timeout=self.timeout,
             )
             r.raise_for_status()
-        except requests.exceptions.Timeout as e:
+        except requests.exceptions.Timeout:
             logger.error("YTMD command %r timed out after %ss", command, self.timeout)
             raise
         except requests.exceptions.HTTPError as e:
@@ -83,11 +84,10 @@ class YTMD:
 
     def search_song(self, title: str, artist: str | None = None) -> None:
         """
-        Search YouTube Music (actual) for “title [+ artist]” and play the first match.
+        Search YouTube Music (actual) for "title [+ artist]" and play the first match.
         """
         # 1) Build and run the search
         query = f"{title} by {artist}" if artist else title
-        from ytmusicapi import YTMusic
         ytm = YTMusic()
         results = ytm.search(query, filter="songs", limit=1)
 
