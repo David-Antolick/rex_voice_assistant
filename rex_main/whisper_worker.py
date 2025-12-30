@@ -9,15 +9,60 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 from typing import Optional
 
 import numpy as np
-from faster_whisper import WhisperModel
 import time
 
 import logging
 logger = logging.getLogger(__name__)
 logging.getLogger("faster_whisper").setLevel(logging.WARNING)
+
+
+def _setup_cuda_paths():
+    """Add NVIDIA CUDA DLLs to PATH on Windows.
+
+    The nvidia-cudnn-cu12 and nvidia-cublas-cu12 packages install DLLs
+    but they're not automatically in the DLL search path. This adds them
+    so CTranslate2 can find cudnn_ops64_9.dll, cublas64_12.dll, etc.
+    """
+    if sys.platform != "win32":
+        return
+
+    paths_to_add = []
+
+    # cuDNN DLLs
+    try:
+        import nvidia.cudnn
+        cudnn_bin = os.path.join(os.path.dirname(nvidia.cudnn.__file__), "bin")
+        if os.path.isdir(cudnn_bin):
+            paths_to_add.append(cudnn_bin)
+    except ImportError:
+        logger.debug("nvidia-cudnn-cu12 not installed")
+    except Exception as e:
+        logger.debug("Could not find cuDNN path: %s", e)
+
+    # cuBLAS DLLs
+    try:
+        import nvidia.cublas
+        cublas_bin = os.path.join(os.path.dirname(nvidia.cublas.__file__), "bin")
+        if os.path.isdir(cublas_bin):
+            paths_to_add.append(cublas_bin)
+    except ImportError:
+        logger.debug("nvidia-cublas-cu12 not installed")
+    except Exception as e:
+        logger.debug("Could not find cuBLAS path: %s", e)
+
+    # Add all paths
+    if paths_to_add:
+        for p in paths_to_add:
+            current_path = os.environ.get("PATH", "")
+            if p not in current_path:
+                os.environ["PATH"] = p + os.pathsep + current_path
+                logger.debug("Added to PATH: %s", p)
+                if hasattr(os, "add_dll_directory"):
+                    os.add_dll_directory(p)
 
 
 __all__ = ["WhisperWorker"]
@@ -73,7 +118,7 @@ class WhisperWorker:
         )
 
         # model will be loaded lazily inside the first loop iteration so that
-        self._model: Optional[WhisperModel] = None
+        self._model = None  # WhisperModel, imported lazily
 
     async def run(self):
         """Endless worker coroutine."""
@@ -108,6 +153,14 @@ class WhisperWorker:
 
         # Allow HF cache overwrite for container images with read-only home
         os.environ.setdefault("HF_HUB_CACHE", "/tmp/hf_cache")
+
+        # Setup CUDA DLL paths on Windows before loading CUDA model
+        if self.device == "cuda":
+            _setup_cuda_paths()
+
+        # Import WhisperModel here AFTER setting up CUDA paths
+        # This ensures ctranslate2 can find the CUDA DLLs
+        from faster_whisper import WhisperModel
 
         # Try to load on requested device, fall back to CPU if CUDA fails
         device = self.device

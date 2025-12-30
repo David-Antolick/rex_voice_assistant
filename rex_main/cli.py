@@ -11,8 +11,34 @@ Commands:
 
 from __future__ import annotations
 
-import asyncio
+# Setup CUDA DLL paths BEFORE importing anything that might load ctranslate2
+import os
 import sys
+
+if sys.platform == "win32":
+    # Add NVIDIA CUDA library paths for cuDNN and cuBLAS
+    # This must happen before ctranslate2/faster-whisper are imported
+    _cuda_paths = []
+
+    # Try to find nvidia package paths
+    try:
+        import nvidia
+        if hasattr(nvidia, "__path__"):
+            for _nvidia_path in nvidia.__path__:
+                for _lib in ["cudnn", "cublas"]:
+                    _bin_path = os.path.join(_nvidia_path, _lib, "bin")
+                    if os.path.isdir(_bin_path) and _bin_path not in _cuda_paths:
+                        _cuda_paths.append(_bin_path)
+    except ImportError:
+        pass
+
+    for _p in _cuda_paths:
+        if _p not in os.environ.get("PATH", ""):
+            os.environ["PATH"] = _p + os.pathsep + os.environ.get("PATH", "")
+            if hasattr(os, "add_dll_directory"):
+                os.add_dll_directory(_p)
+
+import asyncio
 from pathlib import Path
 from typing import Optional
 
