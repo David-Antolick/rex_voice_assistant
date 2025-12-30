@@ -152,7 +152,18 @@ def status():
     audio_cfg = config.get("audio", {})
     console.print(f"\n[bold]Audio:[/bold]")
     console.print(f"  Sample rate: {audio_cfg.get('sample_rate', 16000)} Hz")
-    console.print(f"  PulseAudio server: {audio_cfg.get('pulse_server', 'tcp:localhost:4713')}")
+
+    # Show audio device info
+    try:
+        import sounddevice as sd
+        default_input = sd.default.device[0]
+        if default_input is not None and default_input >= 0:
+            dev_info = sd.query_devices(default_input)
+            console.print(f"  Input device: {dev_info['name']}")
+        else:
+            console.print(f"  Input device: [yellow]No default set[/yellow]")
+    except Exception:
+        console.print(f"  Input device: [yellow]Could not detect[/yellow]")
 
 
 @cli.command()

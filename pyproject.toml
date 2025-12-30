@@ -16,8 +16,6 @@ dependencies = [
     "scipy",
     "sounddevice",
     "soundfile",
-    "pydub",
-    "ffmpeg-python",
     "faster-whisper>=0.10",
     "silero-vad",
     "torch>=2.0",

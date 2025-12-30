@@ -1,29 +1,23 @@
 ## REX - Offline Voice-Controlled Music Assistant
 
-REX is a lightweight, streaming voice assistant that runs transcription locally and controls your music player (YouTube Music Desktop or Spotify). It uses FFmpeg + PulseAudio for audio capture, Silero VAD to chunk utterances, Faster-Whisper for ASR, and a regex router to map text to actions.
+REX is a lightweight, streaming voice assistant that runs transcription locally and controls your music player (YouTube Music Desktop or Spotify). It uses native audio capture via sounddevice, Silero VAD to chunk utterances, Faster-Whisper for ASR, and a regex router to map text to actions.
 
 ---
 
-### Quick Start (5 steps)
+### Quick Start (3 steps)
 
 ```powershell
-# 1. Install prerequisites
-winget install Python.Python.3.12 Gyan.FFmpeg
-
-# 2. Install PulseAudio for Windows
-#    Download from: https://pgaskin.net/pulseaudio-win32/
-
-# 3. Install REX
+# 1. Install REX
 pipx install rex-voice-assistant
-# Or for development:
-pip install -e .
 
-# 4. Run the setup wizard
+# 2. Run the setup wizard
 rex setup
 
-# 5. Start REX
+# 3. Start REX
 rex
 ```
+
+That's it! The setup wizard will guide you through configuring your music service.
 
 ---
 
@@ -31,7 +25,7 @@ rex
 
 | Stage               | Tech                                      | What it does                                   |
 | ------------------- | ----------------------------------------- | ---------------------------------------------- |
-| Audio capture       | `ffmpeg` + PulseAudio (Windows build)      | Streams 16 kHz mono PCM from the default mic   |
+| Audio capture       | `sounddevice` (PortAudio)                  | Streams 16 kHz mono PCM from the default mic   |
 | Voice activity      | Silero VAD (PyTorch, TorchScript)          | Groups frames into utterances                  |
 | Transcription       | Faster-Whisper (CTranslate2 backend)       | Speech to text on CPU or CUDA                   |
 | Command routing     | Regex matcher (`rex_main/matcher.py`)      | Maps recognized text to handlers               |
@@ -71,17 +65,9 @@ rex migrate --from-env  # Import settings from .env file
    winget install Python.Python.3.12
    ```
 
-2. **FFmpeg**
-   ```powershell
-   winget install Gyan.FFmpeg
-   ```
+2. **A microphone** - Any USB or built-in microphone will work
 
-3. **PulseAudio for Windows**
-   - Download from: https://pgaskin.net/pulseaudio-win32/
-   - During install, enable private network access and TCP module options
-   - Start the PulseAudio daemon (installer includes GUI and service options)
-
-4. **Optional: NVIDIA GPU**
+3. **Optional: NVIDIA GPU** for faster transcription
    - Recent NVIDIA driver + CUDA 12 runtime
    - Install CUDA dependencies: `pip install rex-voice-assistant[cuda]`
 
@@ -141,7 +127,6 @@ REX stores configuration in `~/.rex/`:
 | `REX_MODEL`           | Override Whisper model                   |
 | `REX_DEVICE`          | Force CPU/GPU (`cpu`/`cuda`)             |
 | `REX_SERVICE`         | Active service (`ytmd`/`spotify`/`none`) |
-| `PULSE_SERVER`        | PulseAudio server address                |
 | `YTMD_TOKEN`          | YTMD authorization token                 |
 | `YTMD_HOST`           | YTMD host (default: localhost)           |
 | `YTMD_PORT`           | YTMD port (default: 9863)                |
@@ -153,10 +138,10 @@ REX stores configuration in `~/.rex/`:
 
 ### Troubleshooting
 
-**FFmpeg can't open PulseAudio input:**
-- Ensure PulseAudio is running
-- Check `%AppData%/pulse/client.conf` contains `default-server = tcp:localhost:4713`
-- Restart PulseAudio after config changes
+**No audio input detected:**
+- Check Windows sound settings for default microphone
+- Run `rex status` to see detected audio device
+- Try running `rex setup` and use the audio test
 
 **YTMD connection errors:**
 - Run `rex test ytmd` to check connectivity

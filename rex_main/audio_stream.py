@@ -8,15 +8,16 @@ Usage example (inside your main asyncio program):
           # other coroutines (VAD, Whisper, etc.)
 
 Each item placed on *audio_q* is a 1-D NumPy array of float32 PCM samples
-(normalised to -1.0…1.0) exactly *frame_ms* milliseconds long. (default 32ms,512 samples at 16kHz)
+(normalised to -1.0…1.0) exactly *frame_ms* milliseconds long. (default 32ms, 512 samples at 16kHz)
+
+This implementation uses sounddevice for direct Windows/Mac/Linux audio capture.
+No FFmpeg or PulseAudio required.
 """
 
 from __future__ import annotations
 
 import asyncio
-import contextlib
 from typing import Optional
-import subprocess, shlex
 import numpy as np
 import sounddevice as sd
 
@@ -34,12 +35,11 @@ class AudioStream:
     queue : asyncio.Queue[np.ndarray]
         Destination queue that will receive PCM blocks.
     samplerate : int, default 16_000
-        Target sampling rate (Hz).  Make sure downstream models agree.
+        Target sampling rate (Hz). Make sure downstream models agree.
     frame_ms : int, default 32
         Duration of each frame in milliseconds. Must be consistent with VAD framework.
-    pulse_server : str, optional
-        PulseAudio server address (e.g., "tcp:localhost:4713"). If provided, sets
-        PULSE_SERVER environment variable before spawning ffmpeg.
+    device : int or str, optional
+        Input device index or name. None uses system default.
     """
 
     def __init__(
@@ -48,130 +48,116 @@ class AudioStream:
         *,
         samplerate: int = 16_000,
         frame_ms: int = 32,
+        device: Optional[int | str] = None,
+        # Keep pulse_server for backwards compatibility but ignore it
         pulse_server: Optional[str] = None,
     ):
         self.queue = queue
         self.samplerate = samplerate
         self.frame_len = int(samplerate * frame_ms / 1000)
         self.frame_ms = frame_ms
-        self.pulse_server = pulse_server
+        self.device = device
         self._stream: Optional[sd.InputStream] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._stop_evt = asyncio.Event()
 
-    # Public async context-manager helpers
+        if pulse_server:
+            logger.warning("pulse_server parameter is deprecated and ignored. Using native audio capture.")
+
     async def __aenter__(self):
         self._loop = asyncio.get_running_loop()
         self._start_stream()
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
-        # signal _reader() to stop and wait for clean shutdown
-        self._stop_evt.set()
-        await self._reader_task
-
         if self._stream is not None:
             self._stream.stop()
             self._stream.close()
+            self._stream = None
 
-   # Internal helpers
+    def _audio_callback(self, indata: np.ndarray, frames: int, time_info, status):
+        """Called by sounddevice for each audio block."""
+        if status:
+            logger.warning("Audio callback status: %s", status)
+
+        # indata is (frames, channels) - we want mono float32
+        # sounddevice gives us float32 in range [-1, 1] already
+        audio = indata[:, 0].copy()  # Take first channel, copy to avoid memory issues
+
+        # Put into queue (non-blocking from callback thread)
+        try:
+            self._loop.call_soon_threadsafe(
+                lambda: self.queue.put_nowait(audio)
+            )
+        except asyncio.QueueFull:
+            logger.warning("Audio queue full, dropping frame")
+
     def _start_stream(self):
-        """Launch a background ffmpeg process and its reader coroutine.
-
-        We use PulseAudio's 'default' source and write 16-bit little-endian
-        PCM to stdout so no temporary files are created.
-        """
-        import os
-
-        # show configured frame size & rates
+        """Start the sounddevice input stream."""
+        # Log configuration
         logger.debug(
             "AudioStream starting: samplerate=%d Hz, frame_ms=%d ms → frame_len=%d samples",
-             self.samplerate, self.frame_ms, self.frame_len,
+            self.samplerate, self.frame_ms, self.frame_len,
         )
 
-        # Set PULSE_SERVER environment variable if pulse_server is configured
-        env = os.environ.copy()
-        if self.pulse_server:
-            env["PULSE_SERVER"] = self.pulse_server
-            logger.debug("Using PulseAudio server: %s", self.pulse_server)
-
-        # inspect sounddevice input config
-        default_input, _ = sd.default.device
-
-        if default_input is None or default_input < 0:
-            # you're using ffmpeg's "default" source, so sounddevice hasn't picked one
-            logger.debug(
-                "No sounddevice default input device (got %s); FFmpeg default will be used",
-                default_input,
-            )
-            # list actual hardware mics in case you want to bind one later
+        # List available input devices
+        try:
             devices = sd.query_devices()
-            inputs = [
-                (i, d["name"])
-                for i, d in enumerate(devices)
-                if d.get("max_input_channels", 0) > 0
-            ]
-            logger.debug("Available input devices: %s", inputs)
-        else:
-            # real default is set—confirm it
-            try:
+            default_input = sd.default.device[0]
+
+            if default_input is not None and default_input >= 0:
                 dev_info = sd.query_devices(default_input, kind="input")
-                logger.debug(
-                    "sounddevice default input device [%d]: %s",
-                    default_input,
-                    dev_info.get("name", dev_info),
-                )
-            except Exception as e:
-                logger.debug(
-                    "Error querying input device %d: %s",
-                    default_input,
-                    e,
-                )
+                logger.info("Using audio input: [%d] %s", default_input, dev_info.get("name", "Unknown"))
+            else:
+                # Find first available input device
+                inputs = [
+                    (i, d["name"])
+                    for i, d in enumerate(devices)
+                    if d.get("max_input_channels", 0) > 0
+                ]
+                if inputs:
+                    logger.info("Available input devices: %s", inputs)
+                else:
+                    raise RuntimeError("No audio input devices found")
 
+        except Exception as e:
+            logger.error("Error querying audio devices: %s", e)
+            raise
 
-        # Spawn ffmpeg → raw PCM on stdout
-        cmd = [
-            "ffmpeg",
-            "-hide_banner",
-            "-nostats",
-            "-loglevel", "quiet",          # ← pair stays together
-            "-f", "pulse", "-i", "default",
-            "-ac", "1", "-ar", str(self.samplerate),
-            "-f", "s16le", "pipe:1"        # raw int16 to stdout
-        ]
-
-        logger.debug("ffmpeg cmd: %s", " ".join(cmd))
-        self._proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            bufsize=0,  # unbuffered
-            env=env,    # pass modified environment with PULSE_SERVER
-        )
-
-        if self._proc.stdout is None:
-            raise RuntimeError("ffmpeg did not expose stdout")
-
-        # background coroutine that reads from ffmpeg stdout
-        self._reader_task = asyncio.create_task(self._reader())
-
-    async def _reader(self):
-        bytes_needed = self.frame_len * 2          # 1024 bytes for 512 samples
-        buf = bytearray()
-
-        while not self._stop_evt.is_set():
-            chunk = await asyncio.get_running_loop().run_in_executor(
-                None, self._proc.stdout.read, bytes_needed - len(buf)
+        # Create and start the input stream
+        try:
+            self._stream = sd.InputStream(
+                samplerate=self.samplerate,
+                blocksize=self.frame_len,
+                device=self.device,
+                channels=1,
+                dtype=np.float32,
+                callback=self._audio_callback,
             )
-            if not chunk:                          # ffmpeg exited
-                break
-            buf.extend(chunk)
+            self._stream.start()
+            logger.debug("Audio stream started successfully")
 
-            if len(buf) == bytes_needed:
-                pcm = np.frombuffer(buf, dtype=np.int16).astype(np.float32) / 32768.0
-                await self.queue.put(pcm)
-                buf.clear()                        # start next frame
-
-        with contextlib.suppress(ProcessLookupError):
-            self._proc.terminate()
+        except sd.PortAudioError as e:
+            logger.error("Failed to start audio stream: %s", e)
+            logger.error("Make sure a microphone is connected and accessible")
+            raise RuntimeError(f"Audio capture failed: {e}") from e
 
 
+def list_audio_devices() -> list[dict]:
+    """List all available audio input devices.
+
+    Returns:
+        List of dicts with 'index', 'name', 'channels', 'default' keys
+    """
+    devices = []
+    default_input = sd.default.device[0]
+
+    for i, dev in enumerate(sd.query_devices()):
+        if dev.get("max_input_channels", 0) > 0:
+            devices.append({
+                "index": i,
+                "name": dev["name"],
+                "channels": dev["max_input_channels"],
+                "default": i == default_input,
+            })
+
+    return devices

@@ -1,7 +1,7 @@
 audio:
   sample_rate: 16000
   frame_ms: 32
-  pulse_server: "tcp:localhost:4713"
+  # device: null  # Use system default, or set to device index/name
 
 model:
   name: "small.en"

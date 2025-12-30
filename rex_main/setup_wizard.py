@@ -2,8 +2,8 @@
 Interactive setup wizard for REX voice assistant.
 
 Handles:
-1. System check - Detect Python, FFmpeg, PulseAudio, CUDA
-2. Audio setup - Offer PulseAudio install if missing
+1. System check - Detect Python, audio devices, CUDA
+2. Audio device selection - Choose microphone
 3. Media services - Choice of YTMD, Spotify, both, or none
 4. YTMD setup - Authenticate with YouTube Music Desktop
 5. Spotify setup - Guide through developer portal and OAuth
@@ -16,9 +16,7 @@ from __future__ import annotations
 
 import os
 import sys
-import time
 import shutil
-import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -27,7 +25,6 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Prompt, Confirm
 from rich.table import Table
-from rich import print as rprint
 
 console = Console()
 
@@ -45,7 +42,7 @@ def run_wizard():
     if not _check_system():
         return
 
-    # Step 2: Audio setup
+    # Step 2: Audio device selection
     _setup_audio()
 
     # Step 3: Media services
@@ -53,7 +50,6 @@ def run_wizard():
 
     # Step 4 & 5: Configure chosen services
     secrets = {}
-    service_config = {}
 
     if "ytmd" in services:
         ytmd_token = _setup_ytmd()
@@ -105,45 +101,33 @@ def _check_system() -> bool:
     if not py_ok:
         all_ok = False
 
-    # FFmpeg
-    ffmpeg_path = shutil.which("ffmpeg")
-    ffmpeg_ok = ffmpeg_path is not None
+    # Audio devices
+    audio_ok = False
+    audio_details = "Checking..."
+    try:
+        import sounddevice as sd
+        devices = sd.query_devices()
+        inputs = [d for d in devices if d.get("max_input_channels", 0) > 0]
+        if inputs:
+            audio_ok = True
+            default_input = sd.default.device[0]
+            if default_input is not None and default_input >= 0:
+                dev_name = sd.query_devices(default_input)["name"]
+                audio_details = f"{len(inputs)} device(s), default: {dev_name[:30]}"
+            else:
+                audio_details = f"{len(inputs)} device(s) available"
+        else:
+            audio_details = "No microphones found"
+    except Exception as e:
+        audio_details = f"Error: {e}"
+
     table.add_row(
-        "FFmpeg",
-        "[green]OK[/green]" if ffmpeg_ok else "[red]MISSING[/red]",
-        ffmpeg_path or "Install with: winget install Gyan.FFmpeg"
+        "Audio Input",
+        "[green]OK[/green]" if audio_ok else "[red]MISSING[/red]",
+        audio_details
     )
-    if not ffmpeg_ok:
+    if not audio_ok:
         all_ok = False
-
-    # PulseAudio (Windows)
-    pulse_ok = False
-    pulse_details = "Not detected"
-    if sys.platform == "win32":
-        # Check for PulseAudio in common locations
-        pulse_paths = [
-            Path(os.environ.get("PROGRAMFILES", "")) / "PulseAudio" / "bin" / "pulseaudio.exe",
-            Path(os.environ.get("LOCALAPPDATA", "")) / "PulseAudio" / "bin" / "pulseaudio.exe",
-            Path("C:/PulseAudio/bin/pulseaudio.exe"),
-        ]
-        for p in pulse_paths:
-            if p.exists():
-                pulse_ok = True
-                pulse_details = str(p.parent.parent)
-                break
-        if not pulse_ok:
-            pulse_details = "Install from: https://pgaskin.net/pulseaudio-win32/"
-    else:
-        # Linux/Mac - check if pulseaudio is available
-        if shutil.which("pulseaudio") or shutil.which("pactl"):
-            pulse_ok = True
-            pulse_details = "Available"
-
-    table.add_row(
-        "PulseAudio",
-        "[green]OK[/green]" if pulse_ok else "[yellow]MISSING[/yellow]",
-        pulse_details
-    )
 
     # CUDA (optional)
     cuda_ok = False
@@ -166,33 +150,38 @@ def _check_system() -> bool:
     console.print()
 
     if not all_ok:
-        console.print("[red]Some required components are missing. Please install them and run setup again.[/red]")
+        console.print("[red]Some required components are missing.[/red]")
+        if not audio_ok:
+            console.print("[yellow]Please connect a microphone and run setup again.[/yellow]")
         return False
-
-    if not pulse_ok:
-        console.print("[yellow]Warning: PulseAudio not detected. Audio capture may not work.[/yellow]")
-        if not Confirm.ask("Continue anyway?", default=False):
-            return False
 
     return True
 
 
 def _setup_audio():
-    """Set up audio configuration."""
+    """Set up audio device selection."""
     console.print("\n[bold]Step 2: Audio Setup[/bold]\n")
 
-    if sys.platform == "win32":
-        # Create PulseAudio client config
-        pulse_conf_dir = Path(os.environ.get("APPDATA", "")) / "pulse"
-        pulse_conf_file = pulse_conf_dir / "client.conf"
+    try:
+        import sounddevice as sd
+        from rex_main.audio_stream import list_audio_devices
 
-        if not pulse_conf_file.exists():
-            console.print("Creating PulseAudio client configuration...")
-            pulse_conf_dir.mkdir(parents=True, exist_ok=True)
-            pulse_conf_file.write_text("default-server = tcp:localhost:4713\n")
-            console.print(f"  Created: {pulse_conf_file}")
-        else:
-            console.print(f"  PulseAudio config exists: {pulse_conf_file}")
+        devices = list_audio_devices()
+
+        if len(devices) == 1:
+            console.print(f"Using microphone: [cyan]{devices[0]['name']}[/cyan]")
+        elif len(devices) > 1:
+            console.print("Available microphones:")
+            for dev in devices:
+                default_marker = " [green](default)[/green]" if dev["default"] else ""
+                console.print(f"  [{dev['index']}] {dev['name']}{default_marker}")
+
+            console.print()
+            console.print("Using system default microphone.")
+            console.print("[dim]You can change this in ~/.rex/config.yaml later.[/dim]")
+
+    except Exception as e:
+        console.print(f"[yellow]Could not list audio devices: {e}[/yellow]")
 
     console.print("[green]Audio setup complete.[/green]")
 
@@ -407,18 +396,10 @@ def _test_audio():
 
     try:
         import numpy as np
+        import sounddevice as sd
 
-        # Simple test using ffmpeg
-        cmd = [
-            "ffmpeg",
-            "-hide_banner",
-            "-nostats",
-            "-loglevel", "error",
-            "-f", "pulse", "-i", "default",
-            "-ac", "1", "-ar", "16000",
-            "-t", "3",  # 3 seconds
-            "-f", "s16le", "pipe:1"
-        ]
+        duration = 3  # seconds
+        samplerate = 16000
 
         with Progress(
             SpinnerColumn(),
@@ -427,34 +408,25 @@ def _test_audio():
         ) as progress:
             task = progress.add_task("Recording...", total=None)
 
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                timeout=10
-            )
+            # Record audio
+            audio = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype=np.float32)
+            sd.wait()
 
             progress.update(task, description="Processing...")
 
-        if result.returncode == 0 and len(result.stdout) > 0:
-            # Convert to numpy and check audio level
-            audio = np.frombuffer(result.stdout, dtype=np.int16).astype(np.float32) / 32768.0
-            max_level = np.max(np.abs(audio))
-            rms = np.sqrt(np.mean(audio**2))
+        # Check audio level
+        audio = audio.flatten()
+        max_level = np.max(np.abs(audio))
+        rms = np.sqrt(np.mean(audio**2))
 
-            if max_level > 0.01:
-                console.print(f"[green]Audio captured successfully![/green]")
-                console.print(f"  Peak level: {max_level:.2%}")
-                console.print(f"  RMS level: {rms:.2%}")
-            else:
-                console.print("[yellow]Audio captured but level is very low.[/yellow]")
-                console.print("Check your microphone settings.")
+        if max_level > 0.01:
+            console.print(f"[green]Audio captured successfully![/green]")
+            console.print(f"  Peak level: {max_level:.2%}")
+            console.print(f"  RMS level: {rms:.2%}")
         else:
-            console.print("[red]No audio captured.[/red]")
-            if result.stderr:
-                console.print(f"Error: {result.stderr.decode()}")
+            console.print("[yellow]Audio captured but level is very low.[/yellow]")
+            console.print("Check your microphone settings or try speaking louder.")
 
-    except subprocess.TimeoutExpired:
-        console.print("[red]Audio test timed out.[/red]")
     except Exception as e:
         console.print(f"[red]Audio test failed: {e}[/red]")
 
@@ -472,7 +444,6 @@ def _write_config(services: list[str], secrets: dict):
         "audio": {
             "sample_rate": 16000,
             "frame_ms": 32,
-            "pulse_server": "tcp:localhost:4713",
         },
         "model": {
             "name": "small.en",
