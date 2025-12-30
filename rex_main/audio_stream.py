@@ -95,7 +95,7 @@ class AudioStream:
         """Start the sounddevice input stream."""
         # Log configuration
         logger.debug(
-            "AudioStream starting: samplerate=%d Hz, frame_ms=%d ms → frame_len=%d samples",
+            "AudioStream starting: samplerate=%d Hz, frame_ms=%d ms, frame_len=%d samples",
             self.samplerate, self.frame_ms, self.frame_len,
         )
 

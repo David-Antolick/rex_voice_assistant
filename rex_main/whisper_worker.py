@@ -38,7 +38,7 @@ class WhisperWorker:
     compute_type : {"float16", "int8"}, default "float16"
         Mixed-precision mode.  "float16" needs a GPU with FP16 support.
     beam_size : int, default 1
-        Higher → better accuracy, slower latency.
+        Higher = better accuracy, slower latency.
     """
 
     def __init__(
@@ -77,7 +77,7 @@ class WhisperWorker:
             # Debug: chunk size & duration
             cnt = pcm.shape[0] if hasattr(pcm, "shape") else len(pcm)
             dur = cnt / 16000
-            logger.debug("WhisperWorker → got %d samples (~%.2f s)", cnt, dur)
+            logger.debug("WhisperWorker got %d samples (~%.2f s)", cnt, dur)
 
             # Debug: transcription timing
             t0 = time.perf_counter()
@@ -85,10 +85,10 @@ class WhisperWorker:
                 None, self._transcribe, pcm
             )
             dt = (time.perf_counter() - t0) * 1000
-            logger.debug("WhisperWorker → transcription took %.1f ms", dt)
+            logger.debug("WhisperWorker transcription took %.1f ms", dt)
 
             # Debug: transcription output
-            logger.debug("WhisperWorker → text: %r", text)
+            logger.debug("WhisperWorker text: %r", text)
 
             await self.out_q.put(text)
             self.in_q.task_done()
@@ -100,16 +100,39 @@ class WhisperWorker:
         # Allow HF cache overwrite for container images with read-only home
         os.environ.setdefault("HF_HUB_CACHE", "/tmp/hf_cache")
 
-        self._model = WhisperModel(
-        self.model_name,
-        device=self.device,
-        compute_type=self.compute_type,
-        download_root=os.getenv("HF_MODEL_HOME", "/tmp/hf_models"),
-        )   
+        # Try to load on requested device, fall back to CPU if CUDA fails
+        device = self.device
+        compute_type = self.compute_type
+
+        try:
+            self._model = WhisperModel(
+                self.model_name,
+                device=device,
+                compute_type=compute_type,
+                download_root=os.getenv("HF_MODEL_HOME", "/tmp/hf_models"),
+            )
+        except Exception as e:
+            if device == "cuda":
+                logger.warning("CUDA initialization failed: %s", e)
+                logger.warning("Falling back to CPU mode")
+                device = "cpu"
+                compute_type = "float32"
+                self._model = WhisperModel(
+                    self.model_name,
+                    device=device,
+                    compute_type=compute_type,
+                    download_root=os.getenv("HF_MODEL_HOME", "/tmp/hf_models"),
+                )
+            else:
+                raise
+
+        # Update instance vars to reflect actual device used
+        self.device = device
+        self.compute_type = compute_type
 
         logger.info(
-        "Loaded WhisperModel '%s' on %s [%s]",
-        self.model_name, self.device, self.compute_type,
+            "Loaded WhisperModel '%s' on %s [%s]",
+            self.model_name, self.device, self.compute_type,
         )
 
     # called in threadpool so can be blocking/heavy

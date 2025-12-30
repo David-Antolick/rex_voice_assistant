@@ -77,7 +77,7 @@ class YTMD:
             logger.error("YTMD command %r connection error: %s", command, e)
             raise
         else:
-            logger.debug("YTMD → %s (%s)", command, value)
+            logger.debug("YTMD: %s (%s)", command, value)
 
 
 
@@ -202,19 +202,19 @@ class SpotifyClient:
     # music control
     def play_music(self):
         self.sp.start_playback(device_id=self.device_id)
-        logger.info("Spotify → play")
+        logger.info("Spotify: play")
 
     def stop_music(self):
         self.sp.pause_playback(device_id=self.device_id)
-        logger.info("Spotify → pause")
+        logger.info("Spotify: pause")
 
     def next_track(self):
         self.sp.next_track(device_id=self.device_id)
-        logger.info("Spotify → next")
+        logger.info("Spotify: next")
 
     def previous_track(self):
         self.sp.previous_track(device_id=self.device_id)
-        logger.info("Spotify → previous")
+        logger.info("Spotify: previous")
 
     def restart_track(self) -> None:
         """Seek to the start of the current track."""

@@ -100,7 +100,7 @@ class SileroVAD:
 
             if speech_prob >= self.speech_th:
                 if not speech_buf:
-                    # first real speech frame → prepend the buffer
+                    # first real speech frame - prepend the buffer
                     speech_buf.extend(self._pre_buf)
                     self._pre_buf.clear()
                 speech_buf.append(frame)
@@ -115,7 +115,7 @@ class SileroVAD:
                         frame_count = len(speech_buf)
                         duration_s = frame_count * (self.frame_ms / 1000)
                         logger.info(
-                            "SileroVAD → flushing utterance: %d frames (~%.2f s)",
+                            "SileroVAD flushing utterance: %d frames (~%.2f s)",
                             frame_count, duration_s
                         )
                         await self.out_q.put(utterance)

@@ -135,10 +135,29 @@ def _check_system() -> bool:
     try:
         import torch
         if torch.cuda.is_available():
-            cuda_ok = True
-            cuda_details = f"CUDA {torch.version.cuda}, {torch.cuda.get_device_name(0)}"
+            # Also check if cuDNN is actually working
+            try:
+                cuda_ok = True
+                cuda_details = f"CUDA {torch.version.cuda}, {torch.cuda.get_device_name(0)}"
+            except Exception as e:
+                cuda_details = f"CUDA available but error: {e}"
+        else:
+            # Check if NVIDIA GPU exists but CUDA isn't configured
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    gpu_name = result.stdout.strip().split('\n')[0]
+                    cuda_details = f"GPU found ({gpu_name}) but CUDA not configured"
+            except Exception:
+                pass
     except ImportError:
         cuda_details = "PyTorch not installed yet"
+    except Exception as e:
+        cuda_details = f"Error checking CUDA: {e}"
 
     table.add_row(
         "CUDA (optional)",
