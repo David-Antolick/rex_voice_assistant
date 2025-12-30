@@ -52,7 +52,7 @@ console = Console()
 
 @click.group(invoke_without_command=True)
 @click.option("--model", default="small.en", help="Whisper model size (tiny|base|small|medium|large)")
-@click.option("--device", default="auto", type=click.Choice(["cuda", "cpu", "auto"]), help="Device for inference (auto=CPU, use cuda for GPU)")
+@click.option("--device", default="auto", type=click.Choice(["cuda", "cpu", "auto"]), help="Device for inference (auto=detect GPU, fallback to CPU)")
 @click.option("--beam", default=1, type=int, help="Beam size for Whisper decoding")
 @click.option("--log-file", default=None, help="Path to write rotating logs")
 @click.option("--debug", is_flag=True, help="Enable verbose logging")

@@ -39,8 +39,13 @@ def run_wizard():
     console.print()
 
     # Step 1: System check
-    if not _check_system():
+    cuda_ok = _check_system()
+    if cuda_ok is None:  # Required components missing
         return
+
+    # Step 1b: Offer to install CUDA PyTorch if GPU found but CUDA not working
+    if cuda_ok is False:
+        _offer_cuda_setup()
 
     # Step 2: Audio device selection
     _setup_audio()
@@ -79,8 +84,14 @@ def run_wizard():
     ))
 
 
-def _check_system() -> bool:
-    """Check system requirements and display status."""
+def _check_system() -> Optional[bool]:
+    """Check system requirements and display status.
+
+    Returns:
+        True: All OK including CUDA
+        False: Required components OK but CUDA not working (GPU found)
+        None: Required components missing (cannot continue)
+    """
     console.print("[bold]Step 1: System Check[/bold]\n")
 
     table = Table(title="System Requirements")
@@ -129,17 +140,20 @@ def _check_system() -> bool:
     if not audio_ok:
         all_ok = False
 
-    # CUDA (optional)
+    # CUDA (recommended for speed)
     cuda_ok = False
-    cuda_details = "Not detected (CPU mode will be used)"
+    gpu_found = False
+    cuda_details = "Not detected (will use slower CPU mode)"
     try:
         import torch
         if torch.cuda.is_available():
             # Also check if cuDNN is actually working
             try:
                 cuda_ok = True
+                gpu_found = True
                 cuda_details = f"CUDA {torch.version.cuda}, {torch.cuda.get_device_name(0)}"
             except Exception as e:
+                gpu_found = True
                 cuda_details = f"CUDA available but error: {e}"
         else:
             # Check if NVIDIA GPU exists but CUDA isn't configured
@@ -150,8 +164,9 @@ def _check_system() -> bool:
                     capture_output=True, text=True, timeout=5
                 )
                 if result.returncode == 0 and result.stdout.strip():
+                    gpu_found = True
                     gpu_name = result.stdout.strip().split('\n')[0]
-                    cuda_details = f"GPU found ({gpu_name}) but CUDA not configured"
+                    cuda_details = f"GPU found ({gpu_name}) but PyTorch CUDA not installed"
             except Exception:
                 pass
     except ImportError:
@@ -160,8 +175,8 @@ def _check_system() -> bool:
         cuda_details = f"Error checking CUDA: {e}"
 
     table.add_row(
-        "CUDA (optional)",
-        "[green]OK[/green]" if cuda_ok else "[yellow]N/A[/yellow]",
+        "CUDA (recommended)",
+        "[green]OK[/green]" if cuda_ok else "[yellow]MISSING[/yellow]",
         cuda_details
     )
 
@@ -172,9 +187,88 @@ def _check_system() -> bool:
         console.print("[red]Some required components are missing.[/red]")
         if not audio_ok:
             console.print("[yellow]Please connect a microphone and run setup again.[/yellow]")
-        return False
+        return None  # Cannot continue
 
-    return True
+    if cuda_ok:
+        return True  # All good including CUDA
+    elif gpu_found:
+        return False  # GPU found but CUDA not working - offer setup
+    else:
+        return True  # No GPU, but that's OK - will use CPU
+
+
+def _offer_cuda_setup():
+    """Offer to install CUDA-enabled PyTorch for GPU acceleration."""
+    console.print("[bold yellow]GPU Detected but CUDA not configured[/bold yellow]\n")
+
+    console.print("Your system has an NVIDIA GPU, but PyTorch was installed without CUDA support.")
+    console.print("Installing CUDA-enabled PyTorch will make transcription [bold]5-10x faster[/bold].")
+    console.print()
+
+    if not Confirm.ask("Would you like to install CUDA-enabled PyTorch now?", default=True):
+        console.print("[dim]Skipping CUDA setup. REX will use CPU mode (slower).[/dim]")
+        console.print("[dim]You can install later with:[/dim]")
+        console.print("[dim]  pipx runpip rex-voice-assistant install torch --index-url https://download.pytorch.org/whl/cu124 --force-reinstall[/dim]")
+        return
+
+    console.print("\nInstalling CUDA-enabled PyTorch (this may take a few minutes)...")
+    console.print("[dim]Downloading ~2.5GB from PyTorch servers...[/dim]\n")
+
+    try:
+        import subprocess
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Installing PyTorch with CUDA support...", total=None)
+
+            # Run pip install with CUDA index
+            result = subprocess.run(
+                [
+                    sys.executable, "-m", "pip", "install",
+                    "torch", "torchaudio",
+                    "--index-url", "https://download.pytorch.org/whl/cu124",
+                    "--force-reinstall", "--quiet"
+                ],
+                capture_output=True, text=True, timeout=600  # 10 minute timeout
+            )
+
+            if result.returncode != 0:
+                progress.update(task, description="[red]Installation failed[/red]")
+                console.print(f"\n[red]Error installing PyTorch:[/red]")
+                console.print(f"[dim]{result.stderr}[/dim]")
+                console.print("\n[yellow]You can try manually with:[/yellow]")
+                console.print("  pipx runpip rex-voice-assistant install torch --index-url https://download.pytorch.org/whl/cu124 --force-reinstall")
+                return
+
+            # Also install cuDNN
+            progress.update(task, description="Installing cuDNN libraries...")
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "install", "nvidia-cudnn-cu12", "--quiet"],
+                capture_output=True, text=True, timeout=120
+            )
+
+            progress.update(task, description="[green]CUDA PyTorch installed![/green]")
+
+        # Verify installation
+        console.print("\nVerifying CUDA installation...")
+        result = subprocess.run(
+            [sys.executable, "-c", "import torch; print('CUDA:', torch.cuda.is_available(), '| GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A')"],
+            capture_output=True, text=True, timeout=30
+        )
+
+        if "CUDA: True" in result.stdout:
+            console.print(f"[green]Success! {result.stdout.strip()}[/green]")
+        else:
+            console.print("[yellow]Installation completed but CUDA verification failed.[/yellow]")
+            console.print("[dim]This may resolve after restarting the setup wizard.[/dim]")
+
+    except subprocess.TimeoutExpired:
+        console.print("[red]Installation timed out. Please try again or install manually.[/red]")
+    except Exception as e:
+        console.print(f"[red]Error during installation: {e}[/red]")
 
 
 def _setup_audio():
@@ -236,22 +330,34 @@ def _setup_ytmd() -> Optional[str]:
     """Set up YouTube Music Desktop authentication."""
     console.print("\n[bold]Step 4: YouTube Music Desktop Setup[/bold]\n")
 
-    console.print("To authenticate with YTMD, you need:")
-    console.print("  1. YouTube Music Desktop app running")
-    console.print("  2. Companion Server enabled in YTMD settings")
+    console.print("YouTube Music Desktop (YTMD) is a standalone desktop app for YouTube Music.")
+    console.print()
+    console.print("[bold cyan]Installation:[/bold cyan]")
+    console.print("  Download from: [link=https://ytmdesktop.app]https://ytmdesktop.app[/link]")
+    console.print()
+    console.print("[bold cyan]Required Settings in YTMD:[/bold cyan]")
+    console.print("  1. Open YTMD and click the [bold]gear icon[/bold] (Settings)")
+    console.print("  2. Scroll to [bold]\"Integrations\"[/bold] section")
+    console.print("  3. Enable these options:")
+    console.print("     [green]✓[/green] Companion Server")
+    console.print("     [green]✓[/green] Companion Authorization")
+    console.print()
+    console.print("[dim]The Companion Server allows REX to control playback via local API.[/dim]")
     console.print()
 
     if not Confirm.ask("Is YTMD running with Companion Server enabled?", default=True):
-        console.print("[yellow]Please start YTMD and enable Companion Server, then run 'rex setup' again.[/yellow]")
+        console.print("[yellow]Please install/configure YTMD and run 'rex setup' again.[/yellow]")
         return None
 
-    host = Prompt.ask("YTMD host", default="localhost")
-    port = Prompt.ask("YTMD port", default="9863")
-
+    # Use default host/port - these rarely need to change
+    host = "localhost"
+    port = "9863"
     base_url = f"http://{host}:{port}"
 
+    console.print(f"[dim]Connecting to YTMD at {base_url}...[/dim]")
+
     # Step 1: Request auth code
-    console.print("\nRequesting authentication code from YTMD...")
+    console.print("Requesting authentication code from YTMD...")
 
     try:
         import requests
@@ -259,7 +365,11 @@ def _setup_ytmd() -> Optional[str]:
         # Request code
         resp = requests.post(
             f"{base_url}/api/v1/auth/requestcode",
-            json={"appId": "rex-voice-assistant", "appName": "REX Voice Assistant"},
+            json={
+                "appId": "rex_voice_assistant",
+                "appName": "REX Voice Assistant",
+                "appVersion": "1.0.0"
+            },
             timeout=10
         )
 
@@ -275,25 +385,35 @@ def _setup_ytmd() -> Optional[str]:
             console.print("[red]No code received from YTMD[/red]")
             return None
 
+        console.print(f"[green]Got authorization code: {code}[/green]")
+        console.print()
+
         console.print(Panel.fit(
-            f"[bold yellow]Authorization Code: {code}[/bold yellow]\n\n"
-            "Go to YTMD app and approve the connection request.",
-            title="Action Required"
+            "When you press Enter, a popup will appear in YTMD.\n"
+            "Click [bold]Allow[/bold] in the popup to authorize REX.\n\n"
+            "[dim]If no popup appears, check that 'Companion Authorization'\n"
+            "is enabled in YTMD Settings > Integrations.[/dim]",
+            title="Ready to Authorize"
         ))
 
-        # Wait for user to approve
-        input("\nPress Enter after you've approved the request in YTMD...")
+        input("\nPress Enter to show the authorization popup in YTMD...")
 
-        # Exchange code for token
-        console.print("Exchanging code for token...")
+        # This request triggers the popup in YTMD - it waits until user clicks Allow
+        console.print("Waiting for you to click 'Allow' in YTMD...")
         resp = requests.post(
             f"{base_url}/api/v1/auth/request",
-            json={"appId": "rex-voice-assistant", "code": code},
-            timeout=10
+            json={"appId": "rex_voice_assistant", "code": code},
+            timeout=60  # Give user time to click Allow
         )
 
         if resp.status_code != 200:
             console.print(f"[red]Failed to get token: HTTP {resp.status_code}[/red]")
+            console.print(f"[dim]Response: {resp.text}[/dim]")
+            console.print()
+            console.print("[yellow]Troubleshooting tips:[/yellow]")
+            console.print("  1. Make sure 'Companion Authorization' is enabled in YTMD settings")
+            console.print("  2. A popup should appear in YTMD when requesting auth - approve it")
+            console.print("  3. If no popup appears, try restarting YTMD")
             return None
 
         data = resp.json()
@@ -319,11 +439,31 @@ def _setup_spotify() -> Optional[dict]:
     """Set up Spotify authentication."""
     console.print("\n[bold]Step 5: Spotify Setup[/bold]\n")
 
-    console.print("To use Spotify, you need to create a Spotify Developer app:")
-    console.print("  1. Go to: https://developer.spotify.com/dashboard")
-    console.print("  2. Create a new app")
-    console.print("  3. Set Redirect URI to: http://127.0.0.1:8888/callback")
-    console.print("  4. Copy your Client ID and Client Secret")
+    console.print("Spotify integration requires a free Spotify Developer account.")
+    console.print()
+    console.print("[bold cyan]Step-by-step setup:[/bold cyan]")
+    console.print()
+    console.print("  [bold]1. Create a Developer Account:[/bold]")
+    console.print("     Go to: [link=https://developer.spotify.com/dashboard]https://developer.spotify.com/dashboard[/link]")
+    console.print("     Sign in with your Spotify account (free or Premium)")
+    console.print()
+    console.print("  [bold]2. Create a New App:[/bold]")
+    console.print("     • Click [bold]\"Create app\"[/bold]")
+    console.print("     • App name: [cyan]REX Voice Assistant[/cyan] (or any name)")
+    console.print("     • App description: [cyan]Voice control for Spotify[/cyan]")
+    console.print("     • Website: can be left blank or use a placeholder")
+    console.print()
+    console.print("  [bold]3. Configure Redirect URI:[/bold]")
+    console.print("     • In your app settings, find [bold]\"Redirect URIs\"[/bold]")
+    console.print("     • Add exactly: [bold green]http://127.0.0.1:8888/callback[/bold green]")
+    console.print("     • Click [bold]\"Add\"[/bold] then [bold]\"Save\"[/bold]")
+    console.print()
+    console.print("  [bold]4. Get Your Credentials:[/bold]")
+    console.print("     • Go to your app's [bold]\"Settings\"[/bold]")
+    console.print("     • Copy the [bold]Client ID[/bold]")
+    console.print("     • Click [bold]\"View client secret\"[/bold] and copy it")
+    console.print()
+    console.print("[dim]Note: Keep your Client Secret private - it's like a password.[/dim]")
     console.print()
 
     if not Confirm.ask("Have you created a Spotify Developer app?", default=False):
@@ -373,14 +513,18 @@ def _setup_model():
 
     console.print("REX uses the Whisper speech recognition model.")
     console.print("Models available: tiny, base, small, medium, large")
-    console.print("  - small.en is recommended for English (good balance of speed/accuracy)")
+    console.print()
+    console.print("[bold cyan]Recommendations:[/bold cyan]")
+    console.print("  • [green]medium[/green] - Best accuracy, recommended if you have a GPU")
+    console.print("  • small.en - Faster, good for English-only on CPU")
+    console.print("  • tiny - Fastest, lower accuracy")
     console.print()
 
     if not Confirm.ask("Would you like to pre-download the model now?", default=True):
         console.print("Model will be downloaded on first run.")
         return
 
-    model_name = Prompt.ask("Model to download", default="small.en")
+    model_name = Prompt.ask("Model to download", default="medium")
 
     console.print(f"\nDownloading {model_name} model...")
 

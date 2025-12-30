@@ -101,11 +101,11 @@ class WhisperWorker:
         self.model_name = model_name
 
         # Handle device selection:
-        # - "auto" or None: default to CPU (safe, avoids cuDNN compatibility issues)
-        # - "cuda": try CUDA (user explicitly requested it)
+        # - "auto" or None: auto-detect CUDA, fall back to CPU
+        # - "cuda": use CUDA (will fail if not available)
         # - "cpu": use CPU
         if device in (None, "auto"):
-            self.device = "cpu"
+            self.device = self._detect_device()
         else:
             self.device = device
 
@@ -119,6 +119,21 @@ class WhisperWorker:
 
         # model will be loaded lazily inside the first loop iteration so that
         self._model = None  # WhisperModel, imported lazily
+
+    def _detect_device(self) -> str:
+        """Auto-detect best available device (CUDA if available, else CPU)."""
+        try:
+            import torch
+            if torch.cuda.is_available():
+                logger.info("CUDA detected, using GPU acceleration")
+                return "cuda"
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.debug("CUDA detection failed: %s", e)
+
+        logger.info("CUDA not available, using CPU")
+        return "cpu"
 
     async def run(self):
         """Endless worker coroutine."""

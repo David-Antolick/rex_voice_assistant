@@ -22,6 +22,11 @@ secrets.yaml
 # IDE
 .vscode/
 .idea/
+.claude/
 
 # Rex user data (not in repo)
 # ~/.rex/ is the user config directory
+
+#Internal Documents:
+DEVELOPMENT.md
+SESSION_SUMMARY.md

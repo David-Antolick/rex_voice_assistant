@@ -67,9 +67,9 @@ rex migrate --from-env  # Import settings from .env file
 
 2. **A microphone** - Any USB or built-in microphone will work
 
-3. **Optional: NVIDIA GPU** for faster transcription
-   - Recent NVIDIA driver + CUDA 12 runtime
-   - Install CUDA dependencies: `pip install rex-voice-assistant[cuda]`
+3. **Optional: NVIDIA GPU** for 5-10x faster transcription
+   - Recent NVIDIA driver (no manual CUDA installation needed)
+   - The setup wizard will offer to install CUDA PyTorch automatically
 
 ---
 
@@ -154,8 +154,9 @@ REX stores configuration in `~/.rex/`:
 - Re-authenticate if needed
 
 **CUDA not being used:**
-- Run with `--device cuda` to force GPU
-- Ensure PyTorch has CUDA support: `python -c "import torch; print(torch.cuda.is_available())"`
+- Run `rex setup` - it will detect your GPU and offer to install CUDA PyTorch
+- Or manually install: `pipx runpip rex-voice-assistant install torch --index-url https://download.pytorch.org/whl/cu124 --force-reinstall`
+- Verify: `rex` should auto-detect and log "CUDA detected, using GPU acceleration"
 
 ---
 

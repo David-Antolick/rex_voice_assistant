@@ -84,12 +84,14 @@ class AudioStream:
         audio = indata[:, 0].copy()  # Take first channel, copy to avoid memory issues
 
         # Put into queue (non-blocking from callback thread)
-        try:
-            self._loop.call_soon_threadsafe(
-                lambda: self.queue.put_nowait(audio)
-            )
-        except asyncio.QueueFull:
-            logger.warning("Audio queue full, dropping frame")
+        # Use a helper that catches QueueFull to avoid spamming errors
+        def _enqueue(data):
+            try:
+                self.queue.put_nowait(data)
+            except asyncio.QueueFull:
+                pass  # Silently drop frame - this happens during slow transcription
+
+        self._loop.call_soon_threadsafe(lambda: _enqueue(audio))
 
     def _start_stream(self):
         """Start the sounddevice input stream."""
