@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rex-voice-assistant"
-version = "0.1.0"
+version = "0.2.0"
 description = "Offline voice assistant for controlling YouTube Music Desktop and Spotify"
 readme = "README.md"
 license = {text = "MIT"}
@@ -32,6 +32,9 @@ dependencies = [
 
 [project.optional-dependencies]
 cuda = ["nvidia-cudnn-cu12==9.5.1.17"]
+dashboard = ["fastapi>=0.100", "uvicorn[standard]>=0.23", "websockets>=11.0"]
+integrations = ["pypresence>=4.3", "obsws-python>=1.6", "aiohttp>=3.8"]
+streamer = ["rex-voice-assistant[dashboard,integrations]"]
 dev = ["pytest", "pytest-asyncio", "black", "ruff"]
 
 [project.scripts]
@@ -45,4 +48,4 @@ where = ["."]
 include = ["rex_main*"]
 
 [tool.setuptools.package-data]
-rex_main = ["default_config.yaml"]
+rex_main = ["default_config.yaml", "dashboard/static/*"]

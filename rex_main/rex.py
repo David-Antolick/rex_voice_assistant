@@ -26,6 +26,7 @@ from rex_main.audio_stream import AudioStream
 from rex_main.vad_stream import SileroVAD
 from rex_main.whisper_worker import WhisperWorker
 from rex_main.matcher import dispatch_command
+from rex_main.metrics_printer import print_metrics_loop
 
 import logging
 logger = logging.getLogger("rex")
@@ -37,7 +38,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Run the REX voice assistant")
     p.add_argument(
         "--model",
-        default="small.en",
+        default="medium",
         help="Whisper model size (tiny|base|small|medium|large or distil-*)",
     )
     p.add_argument(
@@ -138,8 +139,15 @@ async def run_assistant(opts: Any, config: Optional[dict] = None):
     if config:
         pulse_server = config.get("audio", {}).get("pulse_server")
 
+    # Determine VAD silence timeout based on low-latency mode
+    low_latency = getattr(opts, 'low_latency', False)
+    vad_silence_ms = 250 if low_latency else 400
+
+    if low_latency:
+        logger.info("Low-latency mode enabled (VAD timeout: %dms)", vad_silence_ms)
+
     async with AudioStream(audio_q, pulse_server=pulse_server):
-        vad = SileroVAD(audio_q, speech_q)
+        vad = SileroVAD(audio_q, speech_q, silence_ms=vad_silence_ms)
         whisper = WhisperWorker(
             speech_q,
             text_q,
@@ -148,10 +156,14 @@ async def run_assistant(opts: Any, config: Optional[dict] = None):
             beam_size=opts.beam,
         )
 
+        # Pre-warm Whisper model to eliminate cold-start latency
+        whisper.warmup()
+
         tasks = [
             asyncio.create_task(vad.run(), name="vad"),
             asyncio.create_task(whisper.run(), name="whisper"),
             asyncio.create_task(dispatch_command(text_q), name="matcher"),
+            asyncio.create_task(print_metrics_loop(30), name="metrics_printer"),
         ]
 
         # Handle Ctrl-C for graceful shutdown

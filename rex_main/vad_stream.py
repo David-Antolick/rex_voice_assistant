@@ -19,6 +19,8 @@ import numpy as np
 import torch
 import logging
 
+from rex_main.metrics import metrics
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,7 +45,7 @@ class SileroVAD:
         Duration of each frame (needed for silence timeout math).
     speech_threshold : float, default 0.5
         Probability from the model above which a frame is considered speech.
-    silence_ms : int, default 300
+    silence_ms : int, default 400
         Emit an utterance after this much trailing silence.
     max_utterance_ms : int, default 10_000
         Hard cut-off (to avoid runaway buffers if silence never detected).
@@ -57,7 +59,7 @@ class SileroVAD:
         sample_rate: int = 16_000,
         frame_ms: int = 32,
         speech_threshold: float = 0.65,
-        silence_ms: int = 750,
+        silence_ms: int = 400,
         max_utterance_ms: int = 10_000,
         pre_speech_ms: int = 100
     ):
@@ -103,6 +105,8 @@ class SileroVAD:
                     # first real speech frame - prepend the buffer
                     speech_buf.extend(self._pre_buf)
                     self._pre_buf.clear()
+                    # Record speech start for metrics
+                    metrics.record_speech_start()
                 speech_buf.append(frame)
                 silence_ctr = 0
             else:
@@ -114,10 +118,13 @@ class SileroVAD:
                         utterance = np.concatenate(speech_buf, dtype=np.float32)
                         frame_count = len(speech_buf)
                         duration_s = frame_count * (self.frame_ms / 1000)
+                        duration_ms = duration_s * 1000
                         logger.info(
                             "SileroVAD flushing utterance: %d frames (~%.2f s)",
                             frame_count, duration_s
                         )
+                        # Record VAD emit for metrics
+                        metrics.record_vad_emit(duration_ms)
                         await self.out_q.put(utterance)
                         speech_buf.clear()
                         self._pre_buf.clear()

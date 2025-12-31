@@ -42,16 +42,19 @@ rex setup        # Interactive setup wizard
 rex status       # Show configuration and service connectivity
 rex test ytmd    # Test YouTube Music Desktop connection
 rex test spotify # Test Spotify connection
+rex dashboard    # Run metrics dashboard standalone
 rex migrate --from-env  # Import settings from .env file
 ```
 
 **Options for `rex` command:**
 ```
---model     Whisper model (tiny|base|small|medium|large, default: small.en)
---device    Force device (cuda|cpu, default: auto)
---beam      Beam size for decoding (default: 1)
---log-file  Path to log file
---debug     Enable verbose logging
+--model         Whisper model (tiny|base|small|medium|large, default: small.en)
+--device        Force device (cuda|cpu, default: auto)
+--beam          Beam size for decoding (default: 1)
+--log-file      Path to log file
+--debug         Enable verbose logging
+--dashboard     Enable metrics dashboard at http://localhost:8080
+--low-latency   Faster response time (250ms VAD timeout, may cut speech short)
 ```
 
 ---

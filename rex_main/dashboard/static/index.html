@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REX Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>REX Voice Assistant</h1>
+            <div class="status">
+                <span id="connection-status" class="status-indicator disconnected"></span>
+                <span id="connection-text">Connecting...</span>
+            </div>
+        </header>
+
+        <!-- Summary Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="total-commands">0</div>
+                <div class="stat-label">Total Commands</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="match-rate">0%</div>
+                <div class="stat-label">Match Rate</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avg-latency">--</div>
+                <div class="stat-label">Avg E2E Latency</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="session-time">0:00</div>
+                <div class="stat-label">Session Time</div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="charts-row">
+            <div class="chart-container">
+                <h3>Pipeline Latency (ms)</h3>
+                <canvas id="latency-chart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>Command Frequency</h3>
+                <canvas id="command-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Latency Breakdown -->
+        <div class="latency-breakdown">
+            <h3>Latency Breakdown</h3>
+            <div class="latency-bars">
+                <div class="latency-item">
+                    <span class="latency-label">VAD</span>
+                    <div class="latency-bar-container">
+                        <div class="latency-bar vad" id="vad-bar"></div>
+                    </div>
+                    <span class="latency-value" id="vad-value">--</span>
+                </div>
+                <div class="latency-item">
+                    <span class="latency-label">Whisper</span>
+                    <div class="latency-bar-container">
+                        <div class="latency-bar whisper" id="whisper-bar"></div>
+                    </div>
+                    <span class="latency-value" id="whisper-value">--</span>
+                </div>
+                <div class="latency-item">
+                    <span class="latency-label">Execute</span>
+                    <div class="latency-bar-container">
+                        <div class="latency-bar execute" id="execute-bar"></div>
+                    </div>
+                    <span class="latency-value" id="execute-value">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Transcriptions -->
+        <div class="recent-section">
+            <h3>Recent Activity</h3>
+            <table class="recent-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Transcription</th>
+                        <th>Command</th>
+                        <th>Whisper</th>
+                        <th>Execute</th>
+                        <th>E2E</th>
+                    </tr>
+                </thead>
+                <tbody id="recent-tbody">
+                    <tr><td colspan="6" class="empty-message">Waiting for transcriptions...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>

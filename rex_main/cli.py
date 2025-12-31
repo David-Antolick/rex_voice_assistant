@@ -56,8 +56,11 @@ console = Console()
 @click.option("--beam", default=1, type=int, help="Beam size for Whisper decoding")
 @click.option("--log-file", default=None, help="Path to write rotating logs")
 @click.option("--debug", is_flag=True, help="Enable verbose logging")
+@click.option("--dashboard", is_flag=True, help="Enable metrics dashboard at http://localhost:9876")
+@click.option("--dashboard-port", default=9876, type=int, help="Port for metrics dashboard")
+@click.option("--low-latency", is_flag=True, help="Enable low-latency mode (faster response, may cut speech short)")
 @click.pass_context
-def cli(ctx: click.Context, model: str, device: str, beam: int, log_file: Optional[str], debug: bool):
+def cli(ctx: click.Context, model: str, device: str, beam: int, log_file: Optional[str], debug: bool, dashboard: bool, dashboard_port: int, low_latency: bool):
     """REX - Voice-controlled music assistant.
 
     Run without a subcommand to start the voice assistant.
@@ -68,6 +71,9 @@ def cli(ctx: click.Context, model: str, device: str, beam: int, log_file: Option
     ctx.obj["beam"] = beam
     ctx.obj["log_file"] = log_file
     ctx.obj["debug"] = debug
+    ctx.obj["dashboard"] = dashboard
+    ctx.obj["dashboard_port"] = dashboard_port
+    ctx.obj["low_latency"] = low_latency
 
     # If no subcommand, run the assistant
     if ctx.invoked_subcommand is None:
@@ -92,10 +98,24 @@ def run(ctx: click.Context):
     opts.beam = ctx.obj.get("beam") or config.get("model", {}).get("beam_size", 1)
     opts.log_file = ctx.obj.get("log_file") or get_log_file_path(config)
     opts.debug = ctx.obj.get("debug", False)
+    opts.dashboard = ctx.obj.get("dashboard", False)
+    opts.dashboard_port = ctx.obj.get("dashboard_port", 9876)
+    opts.low_latency = ctx.obj.get("low_latency", False)
 
     # Configure services from config
     from rex_main.commands import configure_from_config
     configure_from_config(config)
+
+    # Start dashboard if enabled
+    if opts.dashboard:
+        try:
+            from rex_main.dashboard import start_dashboard
+            if start_dashboard(port=opts.dashboard_port):
+                console.print(f"[green]Dashboard started at http://localhost:{opts.dashboard_port}[/green]")
+            else:
+                console.print("[yellow]Dashboard failed to start (may already be running)[/yellow]")
+        except ImportError:
+            console.print("[yellow]Dashboard dependencies not installed. Install with: pip install rex-voice-assistant[dashboard][/yellow]")
 
     # Import and run main
     from rex_main.rex import run_assistant
@@ -104,6 +124,13 @@ def run(ctx: click.Context):
         asyncio.run(run_assistant(opts, config))
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted by user[/yellow]")
+        # Stop dashboard if running
+        if opts.dashboard:
+            try:
+                from rex_main.dashboard import stop_dashboard
+                stop_dashboard()
+            except Exception:
+                pass
         sys.exit(0)
 
 
@@ -112,6 +139,36 @@ def setup():
     """Interactive setup wizard for REX."""
     from rex_main.setup_wizard import run_wizard
     run_wizard()
+
+
+@cli.command()
+@click.option("--port", default=9876, type=int, help="Port for dashboard server")
+def dashboard(port: int):
+    """Run the metrics dashboard standalone (for viewing past sessions)."""
+    try:
+        from rex_main.dashboard import start_dashboard
+        import time
+    except ImportError:
+        console.print("[red]Dashboard dependencies not installed.[/red]")
+        console.print("Install with: pip install rex-voice-assistant[dashboard]")
+        return
+
+    console.print(f"[bold blue]REX Metrics Dashboard[/bold blue]")
+    console.print(f"Starting dashboard at http://localhost:{port}")
+    console.print("[dim]Press Ctrl+C to stop[/dim]\n")
+
+    if start_dashboard(port=port):
+        console.print(f"[green]Dashboard running at http://localhost:{port}[/green]")
+        try:
+            # Keep running until interrupted
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Stopping dashboard...[/yellow]")
+            from rex_main.dashboard import stop_dashboard
+            stop_dashboard()
+    else:
+        console.print("[red]Failed to start dashboard[/red]")
 
 
 @cli.command()

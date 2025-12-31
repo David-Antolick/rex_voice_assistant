@@ -18,9 +18,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from typing import Callable, Iterable
 
 import rex_main.commands as commands
+from rex_main.metrics import metrics
 
 __all__ = ["dispatch_command"]
 
@@ -82,16 +84,22 @@ async def dispatch_command(text_queue: "asyncio.Queue[str]"):
         logger.debug("Received text: %s", text)
 
         matched = False
+        matched_command = None
         for pattern, func_name in COMMAND_PATTERNS:
             m = pattern.match(text)
             if m:
                 matched = True
+                matched_command = func_name
                 logger.info("Matched command '%s'", func_name)
+                # Record match for metrics
+                metrics.record_command_match(func_name, matched=True)
                 _call_handler(func_name, m.groups())
                 break
 
         if not matched:
             logger.debug("No command matched for input: %r", text)
+            # Record unmatched for metrics
+            metrics.record_command_match(None, matched=False)
 
         text_queue.task_done()
 
@@ -107,6 +115,10 @@ def _call_handler(func_name: str, args: tuple[str, ...]):
         return
 
     try:
+        t0 = time.perf_counter()
         func(*args)
+        dt = (time.perf_counter() - t0) * 1000
+        # Record execution time for metrics
+        metrics.record_command_execute(func_name, dt)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Error while executing '%s': %s", func_name, exc)

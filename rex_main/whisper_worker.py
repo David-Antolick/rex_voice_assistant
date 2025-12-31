@@ -16,6 +16,9 @@ import numpy as np
 import time
 
 import logging
+
+from rex_main.metrics import metrics
+
 logger = logging.getLogger(__name__)
 logging.getLogger("faster_whisper").setLevel(logging.WARNING)
 
@@ -156,6 +159,9 @@ class WhisperWorker:
             dt = (time.perf_counter() - t0) * 1000
             logger.debug("WhisperWorker transcription took %.1f ms", dt)
 
+            # Record transcription for metrics
+            metrics.record_transcription(text, dt)
+
             # Debug: transcription output
             logger.debug("WhisperWorker text: %r", text)
 
@@ -227,6 +233,37 @@ class WhisperWorker:
         )
         # Force generator to execute
         list(segments)
+
+    def warmup(self) -> float:
+        """Pre-warm the model by running a test transcription.
+
+        Call this before the main loop to eliminate cold-start latency.
+
+        Returns:
+            float: Warmup time in milliseconds
+        """
+        self._lazy_init()
+        assert self._model is not None
+
+        # Generate 0.5 seconds of silence for warmup
+        # This is enough to fully warm up the model's inference path
+        warmup_audio = np.zeros(8000, dtype=np.float32)
+
+        logger.info("Warming up Whisper model...")
+        t0 = time.perf_counter()
+
+        segments, _ = self._model.transcribe(
+            warmup_audio,
+            beam_size=self.beam_size,
+            temperature=0.0,
+            language="en",
+        )
+        # Force generator execution
+        list(segments)
+
+        warmup_ms = (time.perf_counter() - t0) * 1000
+        logger.info("Whisper warmup completed in %.0f ms", warmup_ms)
+        return warmup_ms
 
     # called in threadpool so can be blocking/heavy
     def _transcribe(self, pcm: np.ndarray) -> str:
