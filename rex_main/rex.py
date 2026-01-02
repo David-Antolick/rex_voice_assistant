@@ -25,8 +25,9 @@ import numpy as np
 from rex_main.audio_stream import AudioStream
 from rex_main.vad_stream import SileroVAD
 from rex_main.whisper_worker import WhisperWorker
-from rex_main.matcher import dispatch_command
+from rex_main.matcher import dispatch_command, COMMAND_PATTERNS
 from rex_main.metrics_printer import print_metrics_loop
+import rex_main.commands as commands
 
 import logging
 logger = logging.getLogger("rex")
@@ -139,15 +140,10 @@ async def run_assistant(opts: Any, config: Optional[dict] = None):
     if config:
         pulse_server = config.get("audio", {}).get("pulse_server")
 
-    # Determine VAD silence timeout based on low-latency mode
+    # Determine VAD mode based on low-latency setting
     low_latency = getattr(opts, 'low_latency', False)
-    vad_silence_ms = 250 if low_latency else 400
-
-    if low_latency:
-        logger.info("Low-latency mode enabled (VAD timeout: %dms)", vad_silence_ms)
 
     async with AudioStream(audio_q, pulse_server=pulse_server):
-        vad = SileroVAD(audio_q, speech_q, silence_ms=vad_silence_ms)
         whisper = WhisperWorker(
             speech_q,
             text_q,
@@ -159,12 +155,54 @@ async def run_assistant(opts: Any, config: Optional[dict] = None):
         # Pre-warm Whisper model to eliminate cold-start latency
         whisper.warmup()
 
-        tasks = [
-            asyncio.create_task(vad.run(), name="vad"),
-            asyncio.create_task(whisper.run(), name="whisper"),
-            asyncio.create_task(dispatch_command(text_q), name="matcher"),
-            asyncio.create_task(print_metrics_loop(30), name="metrics_printer"),
-        ]
+        if low_latency:
+            # Use FastVAD with early command detection for lowest latency
+            from rex_main.fast_vad import FastVAD
+            logger.info("Low-latency mode: Using FastVAD with early command detection")
+
+            # Create helper functions for FastVAD
+            def transcribe_sync(audio: np.ndarray) -> str:
+                return whisper._transcribe(audio)
+
+            def match_command(text: str) -> tuple[bool, Optional[str], tuple]:
+                """Check if text matches any command pattern."""
+                text = text.strip()
+                for pattern, func_name in COMMAND_PATTERNS:
+                    m = pattern.match(text)
+                    if m:
+                        return (True, func_name, m.groups())
+                return (False, None, ())
+
+            def execute_command(func_name: str, args: tuple) -> None:
+                """Execute a matched command."""
+                func = getattr(commands, func_name, None)
+                if callable(func):
+                    func(*args)
+
+            fast_vad = FastVAD(
+                audio_q,
+                transcribe_func=transcribe_sync,
+                match_func=match_command,
+                execute_func=execute_command,
+                silence_ms=250,
+                min_speech_ms=300,
+                early_check_interval_ms=200,
+            )
+
+            tasks = [
+                asyncio.create_task(fast_vad.run(), name="fast_vad"),
+                asyncio.create_task(print_metrics_loop(30), name="metrics_printer"),
+            ]
+        else:
+            # Standard mode with separate VAD -> Whisper -> Matcher pipeline
+            vad = SileroVAD(audio_q, speech_q, silence_ms=400)
+
+            tasks = [
+                asyncio.create_task(vad.run(), name="vad"),
+                asyncio.create_task(whisper.run(), name="whisper"),
+                asyncio.create_task(dispatch_command(text_q), name="matcher"),
+                asyncio.create_task(print_metrics_loop(30), name="metrics_printer"),
+            ]
 
         # Handle Ctrl-C for graceful shutdown
         # Note: add_signal_handler doesn't work on Windows, but KeyboardInterrupt is caught

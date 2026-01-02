@@ -1,5 +1,46 @@
 # REX Voice Assistant - Changelog
 
+## [0.2.0] - 2025-12-30
+
+### New Features
+
+#### Metrics Dashboard
+- **Real-time metrics dashboard** at `http://localhost:8080` (enable with `rex --dashboard`)
+- Tracks command match rates, per-stage latencies, command frequency
+- WebSocket-powered live updates every second
+- Charts for latency breakdown (VAD → Whisper → Execute)
+- Recent activity table with timing information
+- Standalone mode: `rex dashboard`
+
+#### Latency Optimization
+- **Reduced VAD silence timeout** from 750ms to 400ms (350ms faster response)
+- **Low-latency mode** (`rex --low-latency`): 250ms timeout for gaming scenarios
+- **Whisper model pre-warming**: Eliminates ~500ms cold-start on first command
+- End-to-end latency now ~500-800ms (down from ~1500-2000ms)
+
+#### New CLI Options
+- `--dashboard` - Enable metrics dashboard
+- `--dashboard-port` - Custom port for dashboard (default: 8080)
+- `--low-latency` - Enable aggressive latency optimization
+
+### New Files
+- `rex_main/metrics.py` - Thread-safe metrics collection
+- `rex_main/dashboard/__init__.py` - Dashboard package
+- `rex_main/dashboard/server.py` - FastAPI backend with WebSocket
+- `rex_main/dashboard/static/index.html` - Dashboard UI
+- `rex_main/dashboard/static/dashboard.js` - Real-time chart updates
+- `rex_main/dashboard/static/dashboard.css` - Modern dark theme styling
+
+### Dependencies
+New optional dependencies added to `pyproject.toml`:
+- `[dashboard]`: fastapi, uvicorn, websockets
+- `[integrations]`: pypresence, obsws-python, aiohttp (for future Discord/OBS support)
+- `[streamer]`: All of the above combined
+
+Install dashboard: `pip install rex-voice-assistant[dashboard]`
+
+---
+
 ## [0.1.0] - 2025-12-30
 
 ### Major Changes - Session Summary
