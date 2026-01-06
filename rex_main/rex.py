@@ -27,6 +27,7 @@ from rex_main.vad_stream import SileroVAD
 from rex_main.whisper_worker import WhisperWorker
 from rex_main.matcher import dispatch_command, COMMAND_PATTERNS
 from rex_main.metrics_printer import print_metrics_loop
+from rex_main.benchmark import benchmark
 import rex_main.commands as commands
 
 import logging
@@ -143,6 +144,12 @@ async def run_assistant(opts: Any, config: Optional[dict] = None):
     # Determine VAD mode based on low-latency setting
     low_latency = getattr(opts, 'low_latency', False)
 
+    # Initialize benchmark tracking
+    mode = "low-latency" if low_latency else "standard"
+    benchmark.set_session_info(mode=mode, model=opts.model)
+    benchmark.start_monitoring(interval_seconds=1.0)
+    logger.info("Benchmark monitoring started (data saved to ~/.rex/benchmarks/)")
+
     async with AudioStream(audio_q, pulse_server=pulse_server):
         whisper = WhisperWorker(
             speech_q,
@@ -216,6 +223,23 @@ async def run_assistant(opts: Any, config: Optional[dict] = None):
         except asyncio.CancelledError:
             logger.info("Shutdown requested - waiting for tasks to finish...")
             await asyncio.gather(*tasks, return_exceptions=True)
+        finally:
+            # Stop benchmark monitoring and export session data
+            benchmark.stop_monitoring()
+            try:
+                filepath = benchmark.export_session()
+                summary = benchmark.get_session_summary()
+                logger.info("=" * 50)
+                logger.info("SESSION SUMMARY")
+                logger.info("  Mode: %s | Model: %s", summary.mode, summary.model)
+                logger.info("  Commands: %d matched / %d total (%.1f%%)",
+                           summary.matched_commands, summary.total_commands, summary.match_rate)
+                logger.info("  Avg E2E: %.0fms | P95: %.0fms", summary.avg_e2e_ms, summary.p95_e2e_ms)
+                logger.info("  Avg CPU: %.1f%% | Avg GPU: %.1f%%", summary.avg_cpu_percent, summary.avg_gpu_percent)
+                logger.info("  Benchmark saved: %s", filepath)
+                logger.info("=" * 50)
+            except Exception as e:
+                logger.warning("Failed to export benchmark: %s", e)
 
 
 def _cancel_tasks(tasks: list[asyncio.Task]):

@@ -20,6 +20,7 @@ import torch
 import logging
 
 from rex_main.metrics import metrics
+from rex_main.benchmark import benchmark
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,7 @@ class SileroVAD:
                     self._pre_buf.clear()
                     # Record speech start for metrics
                     metrics.record_speech_start()
+                    benchmark.record_speech_start()
                 speech_buf.append(frame)
                 silence_ctr = 0
             else:
@@ -125,6 +127,7 @@ class SileroVAD:
                         )
                         # Record VAD emit for metrics
                         metrics.record_vad_emit(duration_ms)
+                        benchmark.record_vad_complete(duration_ms, duration_ms)
                         await self.out_q.put(utterance)
                         speech_buf.clear()
                         self._pre_buf.clear()

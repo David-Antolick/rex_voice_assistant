@@ -19,6 +19,7 @@ import logging
 import time
 
 from rex_main.metrics import metrics
+from rex_main.benchmark import benchmark
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +130,7 @@ class FastVAD:
                     speech_buf.extend(self._pre_buf)
                     self._pre_buf.clear()
                     metrics.record_speech_start()
+                    benchmark.record_speech_start()
                     command_executed = False
                     last_early_text = ""
 
@@ -169,12 +171,18 @@ class FastVAD:
                             exec_dt = (time.perf_counter() - t1) * 1000
                             metrics.record_command_execute(cmd_name, exec_dt)
 
+                            # Record for benchmark
+                            duration_ms = len(speech_buf) * self.frame_ms
+                            audio_duration_ms = len(speech_buf) * self.frame_ms
+                            benchmark.record_vad_complete(duration_ms, audio_duration_ms)
+                            benchmark.record_transcription(dt)
+                            benchmark.record_command(cmd_name, text, True, exec_dt, early_match=True)
+
                             # Mark as executed, but keep collecting
                             # (in case user continues speaking)
                             command_executed = True
 
                             # Clear buffer and reset
-                            duration_ms = len(speech_buf) * self.frame_ms
                             metrics.record_vad_emit(duration_ms)
                             speech_buf.clear()
                             self._pre_buf.clear()
@@ -207,6 +215,9 @@ class FastVAD:
 
                             if text:
                                 metrics.record_transcription(text, dt)
+                                benchmark.record_vad_complete(duration_ms, duration_ms)
+                                benchmark.record_transcription(dt)
+
                                 matched, cmd_name, args = self.match(text)
 
                                 if matched and cmd_name:
@@ -215,8 +226,10 @@ class FastVAD:
                                     self.execute(cmd_name, args)
                                     exec_dt = (time.perf_counter() - t1) * 1000
                                     metrics.record_command_execute(cmd_name, exec_dt)
+                                    benchmark.record_command(cmd_name, text, True, exec_dt, early_match=False)
                                 else:
                                     metrics.record_command_match(None, matched=False)
+                                    benchmark.record_command("none", text, False, 0.0, early_match=False)
                                     logger.debug("No command matched: %r", text)
 
                         # Reset state

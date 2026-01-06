@@ -201,6 +201,87 @@ header h1 {
     font-family: 'Monaco', 'Consolas', monospace;
 }
 
+/* System Resources */
+.resources-section {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.resources-section h3 {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+
+.resource-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+@media (max-width: 900px) {
+    .resource-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.resource-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.resource-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.resource-bar-container {
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.resource-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    min-width: 0;
+}
+
+.resource-bar.cpu-bar {
+    background: linear-gradient(90deg, #00d9ff, #0099cc);
+}
+
+.resource-bar.memory-bar {
+    background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.resource-bar.gpu-bar {
+    background: linear-gradient(90deg, #f5576c, #e94560);
+}
+
+.resource-bar.vram-bar {
+    background: linear-gradient(90deg, #ffd93d, #ff9500);
+}
+
+.resource-value {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    font-family: 'Monaco', 'Consolas', monospace;
+}
+
+.gpu-info {
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
 /* Recent Activity Table */
 .recent-section {
     background: var(--bg-card);

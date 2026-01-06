@@ -22,9 +22,11 @@ import time
 from typing import Callable, Iterable
 
 import rex_main.commands as commands
+import rex_main.steelseries as steelseries
 from rex_main.metrics import metrics
+from rex_main.benchmark import benchmark
 
-__all__ = ["dispatch_command"]
+__all__ = ["dispatch_command", "COMMAND_PATTERNS"]
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,8 @@ COMMAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(rf"^{_WORD}switch\s+to\s+spotify{_END}", re.I), "configure_spotify"),
     (re.compile(rf"^{_WORD}switch\s+to\s+youtube\s+music{_END}", re.I), "configure_ytmd"),
 
+    # Clipping (SteelSeries Moments)
+    (re.compile(rf"^{_WORD}(?:clip\s+(?:that|it)|save\s+(?:that|clip)){_END}", re.I), "clip_that"),
 ]
 
 
@@ -107,11 +111,14 @@ async def dispatch_command(text_queue: "asyncio.Queue[str]"):
 # Helpers
 
 def _call_handler(func_name: str, args: tuple[str, ...]):
-    """Look up *commands.func_name* and invoke it with *args*."""
+    """Look up handler in commands or steelseries module and invoke it with *args*."""
 
+    # Try commands module first, then steelseries module
     func: Callable[..., None] | None = getattr(commands, func_name, None)
+    if func is None:
+        func = getattr(steelseries, func_name, None)
     if not callable(func):
-        logger.error("Handler '%s' not found in commands.py", func_name)
+        logger.error("Handler '%s' not found in commands.py or steelseries.py", func_name)
         return
 
     try:
@@ -120,5 +127,6 @@ def _call_handler(func_name: str, args: tuple[str, ...]):
         dt = (time.perf_counter() - t0) * 1000
         # Record execution time for metrics
         metrics.record_command_execute(func_name, dt)
+        # Note: benchmark.record_command is called from whisper_worker after full pipeline
     except Exception as exc:  # noqa: BLE001
         logger.exception("Error while executing '%s': %s", func_name, exc)

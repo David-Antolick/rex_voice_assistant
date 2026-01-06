@@ -18,6 +18,7 @@ import time
 import logging
 
 from rex_main.metrics import metrics
+from rex_main.benchmark import benchmark
 
 logger = logging.getLogger(__name__)
 logging.getLogger("faster_whisper").setLevel(logging.WARNING)
@@ -161,6 +162,7 @@ class WhisperWorker:
 
             # Record transcription for metrics
             metrics.record_transcription(text, dt)
+            benchmark.record_transcription(dt)
 
             # Debug: transcription output
             logger.debug("WhisperWorker text: %r", text)

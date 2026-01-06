@@ -217,13 +217,15 @@ let pollingInterval = null;
 function startPolling() {
     if (pollingInterval) return; // Already polling
 
-    console.log('Starting polling fallback (every 2 seconds)');
+    console.log('Starting polling fallback (every 3 seconds)');
     pollingInterval = setInterval(async () => {
         try {
-            const [statsRes, recentRes, commandsRes] = await Promise.all([
+            // Single combined request for all data
+            const [statsRes, recentRes, commandsRes, benchmarkRes] = await Promise.all([
                 fetch('/api/stats'),
                 fetch('/api/recent'),
-                fetch('/api/commands')
+                fetch('/api/commands'),
+                fetch('/api/benchmark')
             ]);
 
             const data = {
@@ -232,13 +234,60 @@ function startPolling() {
                 commands: await commandsRes.json()
             };
 
+            const benchmarkData = await benchmarkRes.json();
+
             updateDashboard(data);
+            updateResources(benchmarkData);
             updateConnectionStatus(false, 'Polling');
         } catch (e) {
             console.error('Polling error:', e);
             updateConnectionStatus(false, 'Error');
         }
-    }, 2000);
+    }, 3000);  // Poll every 3 seconds instead of 2
+}
+
+// Benchmark polling is now integrated into startPolling()
+
+function updateResources(data) {
+    if (!data || data.error) return;
+
+    // CPU
+    const cpuPercent = data.cpu_percent || 0;
+    document.getElementById('cpu-bar').style.width = `${cpuPercent}%`;
+    document.getElementById('cpu-value').textContent = `${Math.round(cpuPercent)}%`;
+
+    // Memory
+    const memPercent = data.memory_percent || 0;
+    document.getElementById('memory-bar').style.width = `${memPercent}%`;
+    document.getElementById('memory-value').textContent = `${Math.round(memPercent)}%`;
+
+    // GPU
+    if (data.gpu_available) {
+        const gpuPercent = data.gpu_percent || 0;
+        document.getElementById('gpu-bar').style.width = `${gpuPercent}%`;
+        document.getElementById('gpu-value').textContent = `${Math.round(gpuPercent)}%`;
+
+        // VRAM
+        const vramUsed = data.gpu_memory_used_mb || 0;
+        const vramTotal = data.gpu_memory_total_mb || 1;
+        const vramPercent = (vramUsed / vramTotal) * 100;
+        document.getElementById('vram-bar').style.width = `${vramPercent}%`;
+        document.getElementById('vram-value').textContent = `${Math.round(vramUsed)} MB`;
+
+        // GPU info
+        const gpuInfo = document.getElementById('gpu-info');
+        if (data.gpu_name) {
+            let info = data.gpu_name;
+            if (data.gpu_temperature) {
+                info += ` | ${Math.round(data.gpu_temperature)}°C`;
+            }
+            gpuInfo.textContent = info;
+        }
+    } else {
+        document.getElementById('gpu-value').textContent = 'N/A';
+        document.getElementById('vram-value').textContent = 'N/A';
+        document.getElementById('gpu-info').textContent = 'No GPU detected';
+    }
 }
 
 function stopPolling() {
@@ -270,6 +319,11 @@ function updateDashboard(data) {
     updateRecentTable(data.recent);
     updateCommandChart(data.commands);
     updateLatencyBars(data.stats);
+
+    // Update resources if included (WebSocket path)
+    if (data.resources) {
+        updateResources(data.resources);
+    }
 }
 
 function updateStats(stats) {

@@ -71,16 +71,46 @@ def _get_app():
         """Get latency history for charts."""
         return JSONResponse(content=metrics.get_latency_history(minutes=minutes))
 
+    @app.get("/api/benchmark")
+    async def get_benchmark():
+        """Get benchmark data including system stats."""
+        try:
+            from rex_main.benchmark import benchmark
+            system_stats = benchmark.get_system_stats()
+            return JSONResponse(content={
+                "cpu_percent": system_stats.cpu_percent,
+                "cpu_per_core": system_stats.cpu_per_core,
+                "memory_percent": system_stats.memory_percent,
+                "memory_used_mb": system_stats.memory_used_mb,
+                "gpu_available": system_stats.gpu_available,
+                "gpu_name": system_stats.gpu_name,
+                "gpu_percent": system_stats.gpu_percent,
+                "gpu_memory_used_mb": system_stats.gpu_memory_used_mb,
+                "gpu_memory_total_mb": system_stats.gpu_memory_total_mb,
+                "gpu_temperature": system_stats.gpu_temperature,
+                "recent_commands": benchmark.get_recent_commands(limit=20),
+            })
+        except Exception as e:
+            logger.debug("Benchmark data not available: %s", e)
+            return JSONResponse(content={"error": "Benchmark not available"})
+
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
         """WebSocket endpoint for real-time updates."""
-        logger.info("WebSocket connection attempt from %s", websocket.client)
+        logger.debug("WebSocket connection attempt from %s", websocket.client)
         try:
             await websocket.accept()
             _websocket_clients.add(websocket)
-            logger.info("WebSocket client connected, total: %d", len(_websocket_clients))
+            logger.debug("WebSocket client connected, total: %d", len(_websocket_clients))
 
             try:
+                # Import benchmark for resource stats
+                try:
+                    from rex_main.benchmark import benchmark
+                    has_benchmark = True
+                except ImportError:
+                    has_benchmark = False
+
                 while True:
                     # Check stop signal
                     if _should_stop.is_set():
@@ -92,19 +122,36 @@ def _get_app():
                         "recent": metrics.get_recent_transcriptions(limit=10),
                         "commands": metrics.get_command_frequency()[:10],
                     }
+
+                    # Add benchmark/resource data
+                    if has_benchmark:
+                        try:
+                            system_stats = benchmark.get_system_stats()
+                            data["resources"] = {
+                                "cpu_percent": system_stats.cpu_percent,
+                                "memory_percent": system_stats.memory_percent,
+                                "gpu_available": system_stats.gpu_available,
+                                "gpu_name": system_stats.gpu_name,
+                                "gpu_percent": system_stats.gpu_percent,
+                                "gpu_memory_used_mb": system_stats.gpu_memory_used_mb,
+                                "gpu_memory_total_mb": system_stats.gpu_memory_total_mb,
+                                "gpu_temperature": system_stats.gpu_temperature,
+                            }
+                        except Exception:
+                            pass
+
                     await websocket.send_json(data)
                     await asyncio.sleep(1)
             except WebSocketDisconnect:
-                logger.info("WebSocket client disconnected normally")
+                logger.debug("WebSocket client disconnected normally")
             except Exception as e:
-                logger.warning("WebSocket error: %s", e)
+                logger.debug("WebSocket error: %s", e)
             finally:
                 _websocket_clients.discard(websocket)
-                logger.info("WebSocket client disconnected, total: %d", len(_websocket_clients))
+                logger.debug("WebSocket client disconnected, total: %d", len(_websocket_clients))
         except Exception as e:
-            logger.error("Failed to accept WebSocket connection: %s", e)
-            import traceback
-            logger.error(traceback.format_exc())
+            # Don't log errors for rejected connections (403) - this is expected in some browsers
+            logger.debug("WebSocket connection failed: %s", e)
 
     # Mount static files last (catch-all for CSS, JS)
     if static_dir.exists():
@@ -125,13 +172,13 @@ def _run_server(host: str, port: int):
 
     app = _get_app()
 
-    # Use INFO level to see connection attempts in logs
+    # Disable access logs to keep terminal clean
     config = uvicorn.Config(
         app,
         host=host,
         port=port,
-        log_level="info",
-        access_log=True,
+        log_level="error",  # Only show errors, not every HTTP request
+        access_log=False,
     )
     server = uvicorn.Server(config)
 
