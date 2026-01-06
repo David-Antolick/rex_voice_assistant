@@ -153,7 +153,7 @@ def dashboard(port: int):
         console.print("Install with: pip install rex-voice-assistant[dashboard]")
         return
 
-    console.print(f"[bold blue]REX Metrics Dashboard[/bold blue]")
+    console.print("[bold blue]REX Metrics Dashboard[/bold blue]")
     console.print(f"Starting dashboard at http://localhost:{port}")
     console.print("[dim]Press Ctrl+C to stop[/dim]\n")
 

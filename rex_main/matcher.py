@@ -88,12 +88,10 @@ async def dispatch_command(text_queue: "asyncio.Queue[str]"):
         logger.debug("Received text: %s", text)
 
         matched = False
-        matched_command = None
         for pattern, func_name in COMMAND_PATTERNS:
             m = pattern.match(text)
             if m:
                 matched = True
-                matched_command = func_name
                 logger.info("Matched command '%s'", func_name)
                 # Record match for metrics
                 metrics.record_command_match(func_name, matched=True)

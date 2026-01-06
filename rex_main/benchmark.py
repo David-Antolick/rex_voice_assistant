@@ -161,7 +161,7 @@ class BenchmarkCollector:
         try:
             import importlib.metadata
             return importlib.metadata.version("rex-voice-assistant")
-        except:
+        except Exception:
             try:
                 pyproject = Path(__file__).parent.parent / "pyproject.toml"
                 if pyproject.exists():
@@ -169,7 +169,7 @@ class BenchmarkCollector:
                     for line in content.split("\n"):
                         if line.startswith("version"):
                             return line.split("=")[1].strip().strip('"')
-            except:
+            except Exception:
                 pass
         return "unknown"
 
@@ -344,7 +344,7 @@ class BenchmarkCollector:
                         self._pynvml.NVML_TEMPERATURE_GPU
                     )
                     snapshot.gpu_temperature = temp
-                except:
+                except Exception:
                     pass
             except Exception as e:
                 logger.debug("Error getting GPU stats: %s", e)
