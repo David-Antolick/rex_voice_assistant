@@ -18,14 +18,13 @@ import argparse
 import asyncio
 import signal
 import sys
-from pathlib import Path
 from typing import Optional, Any
 import numpy as np
 
 from rex_main.audio_stream import AudioStream
 from rex_main.vad_stream import SileroVAD
 from rex_main.whisper_worker import WhisperWorker
-from rex_main.matcher import dispatch_command, COMMAND_PATTERNS
+from rex_main.matcher import dispatch_command, COMMAND_PATTERNS, NO_EARLY_MATCH_COMMANDS
 from rex_main.metrics_printer import print_metrics_loop
 from rex_main.benchmark import benchmark
 import rex_main.commands as commands
@@ -108,7 +107,7 @@ async def run_assistant(opts: Any, config: Optional[dict] = None):
         fileh.setLevel(level)
         fileh.setFormatter(formatter)
         root.addHandler(fileh)
-        
+
     # Suppress other loggers to warning level
     logging.getLogger("torio._extension.utils").setLevel(logging.WARNING)
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
@@ -171,14 +170,18 @@ async def run_assistant(opts: Any, config: Optional[dict] = None):
             def transcribe_sync(audio: np.ndarray) -> str:
                 return whisper._transcribe(audio)
 
-            def match_command(text: str) -> tuple[bool, Optional[str], tuple]:
-                """Check if text matches any command pattern."""
+            def match_command(text: str) -> tuple[bool, Optional[str], tuple, bool]:
+                """Check if text matches any command pattern.
+
+                Returns: (matched, func_name, args, allow_early_match)
+                """
                 text = text.strip()
                 for pattern, func_name in COMMAND_PATTERNS:
                     m = pattern.match(text)
                     if m:
-                        return (True, func_name, m.groups())
-                return (False, None, ())
+                        allow_early = func_name not in NO_EARLY_MATCH_COMMANDS
+                        return (True, func_name, m.groups(), allow_early)
+                return (False, None, (), True)
 
             def execute_command(func_name: str, args: tuple) -> None:
                 """Execute a matched command."""

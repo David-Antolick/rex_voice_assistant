@@ -45,7 +45,7 @@ class FastVAD:
     transcribe_func : Callable
         Function that takes audio (np.ndarray) and returns transcribed text.
     match_func : Callable
-        Function that takes text and returns (matched: bool, command_name: str | None).
+        Function that takes text and returns (matched: bool, command_name: str | None, args: tuple, allow_early: bool).
     execute_func : Callable
         Function that executes a matched command.
     sample_rate : int
@@ -66,7 +66,7 @@ class FastVAD:
         self,
         in_queue: asyncio.Queue,
         transcribe_func: Callable[[np.ndarray], str],
-        match_func: Callable[[str], tuple[bool, Optional[str], tuple]],
+        match_func: Callable[[str], tuple[bool, Optional[str], tuple, bool]],
         execute_func: Callable[[str, tuple], None],
         *,
         sample_rate: int = 16_000,
@@ -159,7 +159,11 @@ class FastVAD:
                         logger.debug("Early transcription (%.0fms): %r", dt, text)
 
                         # Check for command match
-                        matched, cmd_name, args = self.match(text)
+                        matched, cmd_name, args, allow_early = self.match(text)
+                        if matched and cmd_name and not allow_early:
+                            # Skip early match for commands that need full utterance (e.g., search)
+                            logger.debug("Skipping early match for '%s' (requires full utterance)", cmd_name)
+                            continue
                         if matched and cmd_name:
                             logger.info("Early match! Command '%s' from: %r", cmd_name, text)
                             metrics.record_transcription(text, dt)
@@ -218,7 +222,7 @@ class FastVAD:
                                 benchmark.record_vad_complete(duration_ms, duration_ms)
                                 benchmark.record_transcription(dt)
 
-                                matched, cmd_name, args = self.match(text)
+                                matched, cmd_name, args, _ = self.match(text)
 
                                 if matched and cmd_name:
                                     metrics.record_command_match(cmd_name, matched=True)

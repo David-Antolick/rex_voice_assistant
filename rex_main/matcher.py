@@ -19,16 +19,22 @@ import asyncio
 import logging
 import re
 import time
-from typing import Callable, Iterable
+from typing import Callable
 
 import rex_main.commands as commands
 import rex_main.steelseries as steelseries
 from rex_main.metrics import metrics
-from rex_main.benchmark import benchmark
 
-__all__ = ["dispatch_command", "COMMAND_PATTERNS"]
+__all__ = ["dispatch_command", "COMMAND_PATTERNS", "NO_EARLY_MATCH_COMMANDS"]
 
 logger = logging.getLogger(__name__)
+
+# Commands that should NOT use early matching (wait for full utterance)
+# These are commands with variable arguments that could be cut off mid-speech
+NO_EARLY_MATCH_COMMANDS: set[str] = {
+    "search_song",      # "search X by Y" - would early-match on "search up" instead of "search upside down"
+    "queue_track",      # "next track X" - same issue
+}
 
 
 # Common helpers (for robustness)
@@ -65,21 +71,22 @@ COMMAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(rf"^{_WORD}shuffle\s+on{_END}", re.I),  "shuffle_on"),
     (re.compile(rf"^{_WORD}shuffle\s+off{_END}", re.I), "shuffle_off"),
     (re.compile(rf"^{_WORD}repeat\s+(off|context|track){_END}", re.I), "set_repeat"),       # captures “off”, “context”, or “track”)
-    (re.compile(rf"^{_WORD}next\s+track(?:\s*[,;:]\s*|\s+)(.+?){_END}", re.I), "queue_track"),  # Queue a specific URI (e.g. “next track (song name)”) 
+    (re.compile(rf"^{_WORD}next\s+track(?:\s*[,;:]\s*|\s+)(.+?){_END}", re.I), "queue_track"),  # Queue a specific URI (e.g. “next track (song name)”)
     (re.compile(rf"^{_WORD}(?:what(?:'s)?\s+playing|current\s+track\s+info|track\s+info){_END}",re.I), "current_track_info"),
 
-    
+
     #  Switching music apps (spotify, youtube music)
     (re.compile(rf"^{_WORD}switch\s+to\s+spotify{_END}", re.I), "configure_spotify"),
     (re.compile(rf"^{_WORD}switch\s+to\s+youtube\s+music{_END}", re.I), "configure_ytmd"),
 
     # Clipping (SteelSeries Moments)
-    (re.compile(rf"^{_WORD}(?:clip\s+(?:that|it)|save\s+(?:that|clip)){_END}", re.I), "clip_that"),
+    # Multiple phrases for better recognition - "capture" and "record" have harder consonants
+    (re.compile(rf"^{_WORD}(?:clip\s+(?:that|it)|save\s+(?:that|clip)|capture\s+(?:that|it)|record\s+(?:that|clip)){_END}", re.I), "clip_that"),
 ]
 
 
 # Public coroutine
-async def dispatch_command(text_queue: "asyncio.Queue[str]"):  
+async def dispatch_command(text_queue: "asyncio.Queue[str]"):
     """Forever task that reads recognised text and triggers handlers."""
     logger.info("dispatch_command started - awaiting recognized text")
 

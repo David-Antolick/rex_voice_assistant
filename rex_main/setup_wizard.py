@@ -16,8 +16,6 @@ from __future__ import annotations
 
 import os
 import sys
-import shutil
-from pathlib import Path
 from typing import Optional
 
 from rich.console import Console
@@ -66,14 +64,17 @@ def run_wizard():
         if spotify_creds:
             secrets.update(spotify_creds)
 
-    # Step 6: Model download
+    # Step 6: SteelSeries Moments (clipping)
+    _setup_steelseries()
+
+    # Step 7: Model download
     _setup_model()
 
-    # Step 7: Audio test (optional)
+    # Step 8: Audio test (optional)
     if Confirm.ask("\nWould you like to run a quick audio test?", default=False):
         _test_audio()
 
-    # Step 8: Write config
+    # Step 9: Write config
     _write_config(services, secrets)
 
     console.print(Panel.fit(
@@ -276,7 +277,6 @@ def _setup_audio():
     console.print("\n[bold]Step 2: Audio Setup[/bold]\n")
 
     try:
-        import sounddevice as sd
         from rex_main.audio_stream import list_audio_devices
 
         devices = list_audio_devices()
@@ -507,9 +507,75 @@ def _setup_spotify() -> Optional[dict]:
         return None
 
 
+def _setup_steelseries():
+    """Set up SteelSeries GG Moments integration for clipping."""
+    console.print("\n[bold]Step 6: SteelSeries Moments (Clipping)[/bold]\n")
+
+    console.print("REX can trigger clips via SteelSeries GG Moments.")
+    console.print("Say [bold cyan]\"clip that\"[/bold cyan] to save gameplay clips.")
+    console.print()
+
+    # Check if SteelSeries GG is installed
+    import os
+
+    coreprops_paths = [
+        os.path.expandvars(r"%PROGRAMDATA%\SteelSeries\SteelSeries Engine 3\coreProps.json"),
+        os.path.expandvars(r"%PROGRAMDATA%\SteelSeries\GG\coreProps.json"),
+    ]
+
+    steelseries_found = False
+    for path in coreprops_paths:
+        if os.path.exists(path):
+            steelseries_found = True
+            break
+
+    if not steelseries_found:
+        console.print("[yellow]SteelSeries GG not detected.[/yellow]")
+        console.print("[dim]If you don't use SteelSeries GG, you can skip this step.[/dim]")
+        console.print("[dim]Download SteelSeries GG from: https://steelseries.com/gg[/dim]")
+        console.print()
+
+        if not Confirm.ask("Would you like to set up SteelSeries integration anyway?", default=False):
+            console.print("[dim]Skipping SteelSeries setup.[/dim]")
+            return
+
+    else:
+        console.print("[green]SteelSeries GG detected![/green]")
+        console.print()
+
+        if not Confirm.ask("Would you like to register REX with SteelSeries GG?", default=True):
+            console.print("[dim]Skipping SteelSeries registration.[/dim]")
+            return
+
+    # Try to register with GameSense
+    console.print("\nRegistering REX with SteelSeries GameSense...")
+
+    try:
+        from rex_main.steelseries import SteelSeriesMoments
+
+        moments = SteelSeriesMoments()
+        if moments.register():
+            console.print("[green]REX registered with SteelSeries GG![/green]")
+            console.print()
+            console.print("[bold cyan]Final step:[/bold cyan]")
+            console.print("  1. Open SteelSeries GG")
+            console.print("  2. Go to [bold]Moments[/bold] → [bold]Settings[/bold] (gear icon)")
+            console.print("  3. Find [bold]\"Apps\"[/bold] or [bold]\"Autoclip\"[/bold] section")
+            console.print("  4. Enable [bold]\"REX Voice Assistant\"[/bold]")
+            console.print()
+            console.print("[dim]Once enabled, say \"clip that\" while Moments is recording.[/dim]")
+        else:
+            console.print("[yellow]Could not register with SteelSeries GG.[/yellow]")
+            console.print("[dim]Make sure SteelSeries GG is running and try again.[/dim]")
+
+    except Exception as e:
+        console.print(f"[yellow]Could not connect to SteelSeries GG: {e}[/yellow]")
+        console.print("[dim]You can set this up later by running 'rex setup' again.[/dim]")
+
+
 def _setup_model():
     """Offer to pre-download the Whisper model."""
-    console.print("\n[bold]Step 6: Model Setup[/bold]\n")
+    console.print("\n[bold]Step 7: Model Setup[/bold]\n")
 
     console.print("REX uses the Whisper speech recognition model.")
     console.print("Models available: tiny, base, small, medium, large")
@@ -552,7 +618,7 @@ def _setup_model():
 
 def _test_audio():
     """Run a quick audio test."""
-    console.print("\n[bold]Step 7: Audio Test[/bold]\n")
+    console.print("\n[bold]Step 8: Audio Test[/bold]\n")
 
     console.print("Testing audio capture for 3 seconds...")
     console.print("Please speak into your microphone.\n")
@@ -596,7 +662,7 @@ def _test_audio():
 
 def _write_config(services: list[str], secrets: dict):
     """Write configuration to ~/.rex/config.yaml."""
-    console.print("\n[bold]Step 8: Saving Configuration[/bold]\n")
+    console.print("\n[bold]Step 9: Saving Configuration[/bold]\n")
 
     from rex_main.config import CONFIG_DIR, save_config, save_secrets, ensure_config_dir
 

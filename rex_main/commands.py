@@ -127,7 +127,7 @@ class YTMD:
         self._send("previous")
 
 
-    # volume 
+    # volume
     def volume_up(self):
         self._send("volumeUp")
     def volume_down(self):
@@ -221,7 +221,7 @@ class SpotifyClient:
         self.sp.seek_track(position_ms=0, device_id=self.device_id)
         logger.info("Spotify restart")
 
-    
+
     # volume control
     def volume_up(self) -> None:
         """Increase volume by 10% (clamped at 100)."""
@@ -247,7 +247,7 @@ class SpotifyClient:
         self.sp.volume(v, device_id=self.device_id)
         logger.info("Spotify volume set to %d%%", v)
 
-    
+
     # thumbs
     def like(self) -> None:
         """Save the current track to Your Library."""
@@ -308,12 +308,12 @@ class SpotifyClient:
         """Return metadata about the current playing item."""
         info = self.sp.current_user_playing_track() or {}
         logger.info("Spotify current playback info: %s", info)
-        return info    
+        return info
 
 
     # Memes
     def so_sad(self) -> None:
-        sad_uri = "spotify:track:6rPO02ozF3bM7NnOV4h6s2"  
+        sad_uri = "spotify:track:6rPO02ozF3bM7NnOV4h6s2"
         self.sp.start_playback(device_id=self.device_id, uris=[sad_uri])
         logger.info("Don't cry!", sad_uri)
 
