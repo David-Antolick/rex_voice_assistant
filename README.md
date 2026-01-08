@@ -106,8 +106,18 @@ rex migrate --from-env  # Import settings from .env file
 | "switch to spotify"               | Switch backend to Spotify   |
 | "switch to youtube music"         | Switch backend to YTMD      |
 | "like", "dislike"                 | Thumbs up/down current track|
+| "clip that", "save clip"          | Save clip (SteelSeries GG)  |
 
 Add custom commands by editing `rex_main/matcher.py` and `rex_main/commands.py`.
+
+#### SteelSeries Moments Clipping
+
+REX integrates with SteelSeries GG Moments for voice-activated clipping:
+
+1. Install [SteelSeries GG](https://steelseries.com/gg) and enable Moments
+2. Run `rex setup` to register REX with GameSense
+3. Enable REX autoclipping in GG: Moments → Settings → Apps → REX Voice Assistant
+4. Say "clip that" while Moments is recording to save a clip
 
 ---
 
@@ -183,8 +193,9 @@ python -m rex_main.rex --debug
 ### Roadmap
 
 - Dynamic hotword ("Hey Rex") with OpenWakeWord
-- More commands (application controls, clipping tools)
-- Linux/macOS support improvements
+- Discord integration (waiting for RPC API access)
+- Application controls (open/close apps)
+- Performance optimizations
 
 ---
 

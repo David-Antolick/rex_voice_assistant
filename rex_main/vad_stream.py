@@ -12,7 +12,6 @@ or hot-swap parameters.
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from typing import Optional, Tuple
 from collections import deque
 import numpy as np
@@ -87,7 +86,7 @@ class SileroVAD:
         self._model: Optional[torch.jit.ScriptModule] = None
         self._h: Optional[Tuple[torch.Tensor, torch.Tensor]] = None  # LSTM hidden-state
 
-    async def run(self):  # noqa: C901 
+    async def run(self):  # noqa: C901
         """Endless coroutine - call with `asyncio.create_task`."""
         self._lazy_init()
         speech_buf: list[np.ndarray] = []
