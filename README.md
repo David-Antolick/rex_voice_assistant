@@ -50,6 +50,7 @@ The setup wizard will guide you through configuring your music service and GPU a
 ```bash
 rex              # Start the voice assistant
 rex setup        # Interactive setup wizard
+rex settings     # Change model, services, and integrations
 rex status       # Show configuration and service connectivity
 rex test ytmd    # Test YouTube Music Desktop connection
 rex test spotify # Test Spotify connection
@@ -128,7 +129,11 @@ REX integrates with [SteelSeries GG Moments](https://steelseries.com/gg) for han
 **Setup:**
 1. Install SteelSeries GG and enable Moments screen recording
 2. Run `rex setup` - it will auto-detect and register REX with GameSense
-3. In SteelSeries GG: Moments → Settings → Apps → Enable "REX Voice Assistant"
+3. Enable REX in SteelSeries GG:
+   - Open GG → Settings (gear icon, bottom left)
+   - Find "Moments" section → "Auto-clip" tab
+   - Enable "Auto-clipping" at the top
+   - Scroll down and check "REX Voice Assistant"
 
 **Voice triggers:** "clip that", "capture that", "record that", "save clip"
 

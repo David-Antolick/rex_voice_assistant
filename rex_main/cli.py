@@ -4,6 +4,7 @@ Unified CLI entry point for REX voice assistant.
 Commands:
     rex           - Run the voice assistant (default)
     rex setup     - Interactive setup wizard
+    rex settings  - Change model, services, and integrations
     rex status    - Show configuration and service connectivity
     rex test      - Test a specific service (ytmd/spotify)
     rex migrate   - Import existing .env to new config
@@ -139,6 +140,115 @@ def setup():
     """Interactive setup wizard for REX."""
     from rex_main.setup_wizard import run_wizard
     run_wizard()
+
+
+@cli.command()
+def settings():
+    """Change REX settings (model, services, integrations)."""
+    from rex_main.config import load_config, save_config, save_secrets
+
+    config = load_config()
+
+    console.print(Panel.fit("[bold blue]REX Settings[/bold blue]"))
+    console.print()
+
+    # Show menu
+    console.print("[bold]What would you like to change?[/bold]")
+    console.print("  1. Change Whisper model")
+    console.print("  2. Change active music service")
+    console.print("  3. Reconfigure YouTube Music Desktop")
+    console.print("  4. Reconfigure Spotify")
+    console.print("  5. Reconfigure SteelSeries Moments")
+    console.print("  6. Back to main menu")
+    console.print()
+
+    from rich.prompt import Prompt, Confirm
+
+    choice = Prompt.ask("Select option", choices=["1", "2", "3", "4", "5", "6"], default="6")
+
+    if choice == "1":
+        # Change model
+        current = config.get("model", {}).get("name", "small.en")
+        console.print(f"\nCurrent model: [cyan]{current}[/cyan]")
+        console.print()
+        console.print("Available models:")
+        console.print("  • tiny - Fastest, lower accuracy")
+        console.print("  • base - Fast, decent accuracy")
+        console.print("  • small.en - Good balance for English")
+        console.print("  • medium - Best accuracy (recommended with GPU)")
+        console.print("  • large - Highest accuracy, slowest")
+        console.print()
+
+        new_model = Prompt.ask(
+            "New model",
+            choices=["tiny", "base", "small.en", "medium", "large"],
+            default=current
+        )
+
+        if new_model != current:
+            config.setdefault("model", {})["name"] = new_model
+            save_config(config)
+            console.print(f"[green]Model changed to: {new_model}[/green]")
+
+            if Confirm.ask("Download model now?", default=True):
+                console.print(f"Downloading {new_model}...")
+                try:
+                    from faster_whisper import WhisperModel
+                    _ = WhisperModel(new_model, device="cpu", compute_type="int8")
+                    console.print("[green]Model downloaded![/green]")
+                except Exception as e:
+                    console.print(f"[yellow]Download failed: {e}[/yellow]")
+                    console.print("Model will download on next run.")
+        else:
+            console.print("[dim]No change made.[/dim]")
+
+    elif choice == "2":
+        # Change active service
+        current = config.get("services", {}).get("active", "none")
+        console.print(f"\nCurrent active service: [cyan]{current}[/cyan]")
+        console.print()
+        console.print("Available services:")
+        console.print("  • ytmd - YouTube Music Desktop")
+        console.print("  • spotify - Spotify")
+        console.print("  • none - Transcription only (no music control)")
+        console.print()
+
+        new_service = Prompt.ask(
+            "Active service",
+            choices=["ytmd", "spotify", "none"],
+            default=current
+        )
+
+        if new_service != current:
+            config.setdefault("services", {})["active"] = new_service
+            save_config(config)
+            console.print(f"[green]Active service changed to: {new_service}[/green]")
+        else:
+            console.print("[dim]No change made.[/dim]")
+
+    elif choice == "3":
+        # Reconfigure YTMD
+        from rex_main.setup_wizard import _setup_ytmd
+        token = _setup_ytmd()
+        if token:
+            save_secrets({"ytmd_token": token})
+            console.print("[green]YTMD reconfigured![/green]")
+
+    elif choice == "4":
+        # Reconfigure Spotify
+        from rex_main.setup_wizard import _setup_spotify
+        creds = _setup_spotify()
+        if creds:
+            save_secrets(creds)
+            console.print("[green]Spotify reconfigured![/green]")
+
+    elif choice == "5":
+        # Reconfigure SteelSeries
+        from rex_main.setup_wizard import _setup_steelseries
+        _setup_steelseries()
+
+    else:
+        console.print("[dim]No changes made.[/dim]")
 
 
 @cli.command()
