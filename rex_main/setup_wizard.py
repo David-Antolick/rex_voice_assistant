@@ -20,14 +20,14 @@ import sys
 import time
 from typing import Optional
 
-# Default model to use if none selected during setup
-_selected_model: str = "small.en"
-
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Prompt, Confirm
 from rich.table import Table
+
+# Default model to use if none selected during setup
+_selected_model: str = "small.en"
 
 console = Console()
 
