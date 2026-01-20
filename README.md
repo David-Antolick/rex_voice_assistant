@@ -1,14 +1,25 @@
 ## REX - Offline Voice-Controlled Music Assistant
 
-REX is a lightweight, streaming voice assistant that runs transcription locally and controls your music player (YouTube Music Desktop or Spotify). It uses native audio capture via sounddevice, Silero VAD to chunk utterances, Faster-Whisper for ASR, and a regex router to map text to actions.
+[![PyPI version](https://img.shields.io/pypi/v/rex-voice-assistant.svg)](https://pypi.org/project/rex-voice-assistant/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+REX is a lightweight, streaming voice assistant that runs **100% locally** - no cloud APIs, no subscriptions. Control your music with your voice and capture gaming moments hands-free.
+
+**Features:**
+- **Music Control** - Play, pause, skip, search, and volume for YouTube Music Desktop or Spotify
+- **Screen Clipping** - Voice-activated clip saving with SteelSeries GG Moments ("clip that!")
+- **Fast & Private** - Whisper speech recognition runs locally on CPU or GPU
+- **Low Latency** - Early command detection means near-instant response
 
 ---
 
-### Quick Start (3 steps)
+### Quick Start
 
 ```powershell
-# 1. Install REX
-pipx install rex-voice-assistant
+# 1. Install REX (choose one)
+pipx install rex-voice-assistant    # Recommended: isolated environment
+pip install rex-voice-assistant     # Or use pip directly
 
 # 2. Run the setup wizard
 rex setup
@@ -17,7 +28,7 @@ rex setup
 rex
 ```
 
-That's it! The setup wizard will guide you through configuring your music service.
+The setup wizard will guide you through configuring your music service and GPU acceleration.
 
 ---
 
@@ -110,14 +121,16 @@ rex migrate --from-env  # Import settings from .env file
 
 Add custom commands by editing `rex_main/matcher.py` and `rex_main/commands.py`.
 
-#### SteelSeries Moments Clipping
+#### SteelSeries Moments (Screen Clipping)
 
-REX integrates with SteelSeries GG Moments for voice-activated clipping:
+REX integrates with [SteelSeries GG Moments](https://steelseries.com/gg) for hands-free clip saving during gameplay. Just say "clip that" and REX triggers a clip save via the GameSense SDK.
 
-1. Install [SteelSeries GG](https://steelseries.com/gg) and enable Moments
-2. Run `rex setup` to register REX with GameSense
-3. Enable REX autoclipping in GG: Moments → Settings → Apps → REX Voice Assistant
-4. Say "clip that" while Moments is recording to save a clip
+**Setup:**
+1. Install SteelSeries GG and enable Moments screen recording
+2. Run `rex setup` - it will auto-detect and register REX with GameSense
+3. In SteelSeries GG: Moments → Settings → Apps → Enable "REX Voice Assistant"
+
+**Voice triggers:** "clip that", "capture that", "record that", "save clip"
 
 ---
 

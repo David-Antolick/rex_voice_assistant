@@ -7,9 +7,23 @@ name = "rex-voice-assistant"
 version = "0.2.0"
 description = "Offline voice assistant for controlling YouTube Music Desktop and Spotify"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.10"
 keywords = ["voice-assistant", "whisper", "spotify", "youtube-music", "speech-recognition"]
+authors = [
+    {name = "David Antolick", email = "david.antolick@gmail.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
 
 dependencies = [
     "numpy>=1.24",
