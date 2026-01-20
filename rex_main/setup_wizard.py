@@ -7,16 +7,21 @@ Handles:
 3. Media services - Choice of YTMD, Spotify, both, or none
 4. YTMD setup - Authenticate with YouTube Music Desktop
 5. Spotify setup - Guide through developer portal and OAuth
-6. Model download - Offer to pre-download Whisper model
-7. Audio test - Quick recording test
-8. Write config - Save to ~/.rex/config.yaml
+6. SteelSeries Moments - Clipping integration
+7. Model download - Offer to pre-download Whisper model
+8. Audio test - Quick recording test
+9. Write config - Save to ~/.rex/config.yaml
 """
 
 from __future__ import annotations
 
 import os
 import sys
+import time
 from typing import Optional
+
+# Default model to use if none selected during setup
+_selected_model: str = "small.en"
 
 from rich.console import Console
 from rich.panel import Panel
@@ -27,8 +32,17 @@ from rich.table import Table
 console = Console()
 
 
+def _step_complete(message: str = "Done!", delay: float = 1.0):
+    """Show step completion message and pause briefly before next step."""
+    console.print(f"[green]{message}[/green]")
+    if delay > 0:
+        time.sleep(delay)
+
+
 def run_wizard():
     """Run the interactive setup wizard."""
+    global _selected_model
+
     console.print(Panel.fit(
         "[bold blue]REX Voice Assistant Setup Wizard[/bold blue]\n\n"
         "This wizard will help you configure REX for first-time use.",
@@ -45,8 +59,11 @@ def run_wizard():
     if cuda_ok is False:
         _offer_cuda_setup()
 
+    time.sleep(0.5)
+
     # Step 2: Audio device selection
     _setup_audio()
+    _step_complete()
 
     # Step 3: Media services
     services = _choose_services()
@@ -58,29 +75,36 @@ def run_wizard():
         ytmd_token = _setup_ytmd()
         if ytmd_token:
             secrets["ytmd_token"] = ytmd_token
+            _step_complete("YTMD configured!")
 
     if "spotify" in services:
         spotify_creds = _setup_spotify()
         if spotify_creds:
             secrets.update(spotify_creds)
+            _step_complete("Spotify configured!")
 
     # Step 6: SteelSeries Moments (clipping)
     _setup_steelseries()
+    time.sleep(0.5)
 
-    # Step 7: Model download
+    # Step 7: Model download (also sets _selected_model)
     _setup_model()
+    _step_complete()
 
     # Step 8: Audio test (optional)
     if Confirm.ask("\nWould you like to run a quick audio test?", default=False):
         _test_audio()
+        _step_complete()
 
-    # Step 9: Write config
+    # Step 9: Write config (uses _selected_model for default)
     _write_config(services, secrets)
 
+    console.print()
     console.print(Panel.fit(
         "[bold green]Setup Complete![/bold green]\n\n"
         "Run [cyan]rex[/cyan] to start the voice assistant.\n"
-        "Run [cyan]rex status[/cyan] to check configuration.",
+        "Run [cyan]rex status[/cyan] to check configuration.\n"
+        "Run [cyan]rex settings[/cyan] to change settings later.",
         border_style="green"
     ))
 
@@ -557,11 +581,14 @@ def _setup_steelseries():
         if moments.register():
             console.print("[green]REX registered with SteelSeries GG![/green]")
             console.print()
-            console.print("[bold cyan]Final step:[/bold cyan]")
+            console.print("[bold cyan]Final step - Enable REX in SteelSeries GG:[/bold cyan]")
             console.print("  1. Open SteelSeries GG")
-            console.print("  2. Go to [bold]Moments[/bold] → [bold]Settings[/bold] (gear icon)")
-            console.print("  3. Find [bold]\"Apps\"[/bold] or [bold]\"Autoclip\"[/bold] section")
-            console.print("  4. Enable [bold]\"REX Voice Assistant\"[/bold]")
+            console.print("  2. Click [bold]Settings[/bold] (gear icon in bottom left)")
+            console.print("  3. Find [bold]\"Moments\"[/bold] section in settings")
+            console.print("  4. Click [bold]\"Auto-clip\"[/bold] tab")
+            console.print("  5. Enable [bold]\"Auto-clipping\"[/bold] at the top")
+            console.print("  6. Scroll down to find [bold]\"REX Voice Assistant\"[/bold]")
+            console.print("  7. Click and check the box to enable it")
             console.print()
             console.print("[dim]Once enabled, say \"clip that\" while Moments is recording.[/dim]")
         else:
@@ -574,11 +601,13 @@ def _setup_steelseries():
 
 
 def _setup_model():
-    """Offer to pre-download the Whisper model."""
+    """Offer to pre-download the Whisper model and set it as default."""
+    global _selected_model
+
     console.print("\n[bold]Step 7: Model Setup[/bold]\n")
 
     console.print("REX uses the Whisper speech recognition model.")
-    console.print("Models available: tiny, base, small, medium, large")
+    console.print("Models available: tiny, base, small.en, medium, large")
     console.print()
     console.print("[bold cyan]Recommendations:[/bold cyan]")
     console.print("  • [green]medium[/green] - Best accuracy, recommended if you have a GPU")
@@ -586,11 +615,18 @@ def _setup_model():
     console.print("  • tiny - Fastest, lower accuracy")
     console.print()
 
-    if not Confirm.ask("Would you like to pre-download the model now?", default=True):
-        console.print("Model will be downloaded on first run.")
-        return
+    model_name = Prompt.ask(
+        "Which model would you like to use?",
+        choices=["tiny", "base", "small.en", "medium", "large"],
+        default="medium"
+    )
 
-    model_name = Prompt.ask("Model to download", default="medium")
+    # Save selection for config
+    _selected_model = model_name
+
+    if not Confirm.ask(f"Download {model_name} model now?", default=True):
+        console.print(f"[dim]Model will be downloaded on first run. Default set to: {model_name}[/dim]")
+        return
 
     console.print(f"\nDownloading {model_name} model...")
 
@@ -609,11 +645,11 @@ def _setup_model():
 
             progress.update(task, description="Model downloaded!")
 
-        console.print(f"[green]Model {model_name} is ready![/green]")
+        console.print(f"[green]Model {model_name} is ready and set as default![/green]")
 
     except Exception as e:
         console.print(f"[yellow]Could not download model: {e}[/yellow]")
-        console.print("Model will be downloaded on first run.")
+        console.print(f"[dim]Model will be downloaded on first run. Default set to: {model_name}[/dim]")
 
 
 def _test_audio():
@@ -662,20 +698,22 @@ def _test_audio():
 
 def _write_config(services: list[str], secrets: dict):
     """Write configuration to ~/.rex/config.yaml."""
+    global _selected_model
+
     console.print("\n[bold]Step 9: Saving Configuration[/bold]\n")
 
     from rex_main.config import CONFIG_DIR, save_config, save_secrets, ensure_config_dir
 
     ensure_config_dir()
 
-    # Build config
+    # Build config with selected model
     config = {
         "audio": {
             "sample_rate": 16000,
             "frame_ms": 32,
         },
         "model": {
-            "name": "small.en",
+            "name": _selected_model,
             "device": "auto",
             "beam_size": 1,
             "cache_dir": str(CONFIG_DIR / "models"),
